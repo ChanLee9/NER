@@ -43,6 +43,7 @@
   | B+L+C | 0.8411 | 0.8661 | 0.8534 |
   | D+B+L+C | 0.8492 | 0.8731 | 0.8611 |
 2. 训练优化部分
+
   baseline: BERT_BiLSTM_CRF
   
   batch_size: 12
