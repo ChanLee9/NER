@@ -11,7 +11,7 @@ class Model(nn.Module):
         self.bert = BertModel.from_pretrained(
             self.config.pretrained_model_path, 
             output_hidden_states=True
-        )
+        )git 
         self.fc1 = lora.Linear(
             in_features=24*1024,
             out_features=1024,
