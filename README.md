@@ -44,7 +44,9 @@
   | D+B+L+C | 0.8492 | 0.8731 | 0.8611 |
 2. 训练优化部分
   baseline: BERT_BiLSTM_CRF
+  
   batch_size: 12
+  
   seq_len: 256
 
   | ~ | 显存消耗 | 平均单个epoch耗时 | 可训练参数 | F1 score |
