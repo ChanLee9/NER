@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 from torchcrf import CRF
 
@@ -8,11 +9,12 @@ class Model(nn.Module):
         self.config = config
         self.vocab_size = 1970
         self.embedding_dim = 128
+        self.pad_id = 0
         
         self.embed = nn.Embedding(
             self.vocab_size, 
             self.embedding_dim, 
-            self.config.pad_id
+            self.pad_id
         )
         self.lstm = nn.LSTM(
             self.embedding_dim,
@@ -25,7 +27,7 @@ class Model(nn.Module):
         self.linear = nn.Linear(2*self.config.hidden_size, self.config.label_size)
         self.crf = CRF(self.config.label_size, batch_first=True)
     
-    def forward(self, input, mask):   
+    def forward(self, input, labels, mask):   
         output = self.get_lstm_results(input)
         output, _ = self.attention(output, output, output)
         output = self.linear(output)
@@ -42,5 +44,6 @@ class Model(nn.Module):
         output, _ = self.attention(output, output, output)
         output = self.linear(output)
         if label != None:
+            label = torch.where(label == -100, 0, label)
             loss = self.crf(output, label, mask)
         return (-1)*loss

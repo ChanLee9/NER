@@ -24,9 +24,16 @@ def train_loop(dataloader, model, optimizer, lr_scheduler, epoch, config):     #
         scaler = torch.cuda.amp.GradScaler()
     model.train()  
     iter_num = 3    # 梯度累计的更新频率
-    for batch, (text_encoding, label_ids) in enumerate(dataloader):
-        input_ids = text_encoding['input_ids']
-        mask = text_encoding['attention_mask']        
+    for batch, encodings in enumerate(dataloader):
+        if 'BERT' not in config.model:
+            input_ids = encodings[0]
+            label_ids = encodings[1]
+            mask = encodings[2]
+        else:
+            text_encoding = encodings[0]
+            label_ids = encodings[1]
+            input_ids = text_encoding['input_ids']
+            mask = text_encoding['attention_mask']        
         if config.use_amp:
             # 把计算loss过程中可以转化成混合精度的自动转换
             with torch.cuda.amp.autocast():
@@ -35,7 +42,7 @@ def train_loop(dataloader, model, optimizer, lr_scheduler, epoch, config):     #
                 scaler.scale(loss).backward()
                 # 梯度累计
                 if config.use_grad_accumulat:
-                    if (batch+1)%iter_num == 0:
+                    if (batch+1) % iter_num == 0:
                         scaler.step(optimizer)
                         lr_scheduler.step()
                         scaler.update()
@@ -62,15 +69,22 @@ def train_loop(dataloader, model, optimizer, lr_scheduler, epoch, config):     #
         progress_bar.update(1)
     return total_loss
 
-def test_loop(dataloader, model, mode):
+def test_loop(config, dataloader, model, mode):
     assert mode in ['validat', 'test'], 'mode must be validation or test!'
     print(f'-------------------------{mode}ing----------------------------')
     model.eval()
     P, R, F1 = [], [], []
     with torch.no_grad():
-        for batch, (text_encoding, label_ids) in enumerate(dataloader):
-            input_ids = text_encoding['input_ids']
-            mask = text_encoding['attention_mask'] 
+        for batch, encodings in enumerate(dataloader):
+            if 'BERT' not in config.model:
+                input_ids = encodings[0]
+                label_ids = encodings[1]
+                mask = encodings[2]
+            else:
+                text_encoding = encodings[0]
+                label_ids = encodings[1]
+                input_ids = text_encoding['input_ids']
+                mask = text_encoding['attention_mask'] 
             # y_pred的例子 ：[[1, 2, 3], [2, 3], [1]], 之所以长度不同是因为有mask的存在。长度递减是因为dataloader中按照长度给输入排序了。
             y_pred = model(input_ids, label_ids, mask)
             p, r, f1 = eval(y_pred, label_ids)
@@ -91,7 +105,10 @@ def eval(y_pred, label_ids):
     for row in y_pred:
         if len(row) < max_len:
             row += [0]*(max_len-len(row))
-    y_pred = torch.tensor(y_pred)  
+    if isinstance(y_pred, list):
+        y_pred = torch.tensor(y_pred)
+    elif isinstance(y_pred, torch.Tensor):
+        y_pred = y_pred.clone().detach()
     assert y_pred.shape == label_ids.shape, 'wrong dimension!'
     y_pred = y_pred.flatten().cpu()
     label_ids = label_ids.flatten().cpu()
@@ -100,3 +117,4 @@ def eval(y_pred, label_ids):
     F1 = f1_score(label_ids, y_pred, average='macro', zero_division=0)
     
     return P, R, F1
+

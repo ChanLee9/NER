@@ -67,9 +67,14 @@ def k_folds(config):
         train_dataloader = Dataloader(config, train_dataset).dataloader
         val_dataloader = Dataloader(config, val_dataset).dataloader
         if config.use_lora:
+            print('using lora...\n')
             lora.mark_only_lora_as_trainable(model)
             # 把 lstm和crf中的参数设置为可学习
             unfreeze_params(model)
+        if config.use_amp:
+            print('using amp...\n')
+        if config.use_grad_accumulat:
+            print('using gradient accumulating...\n')
             
         # 查看模型可训练参数量
         trainable_params = get_trainable_params(model)
@@ -84,7 +89,7 @@ def k_folds(config):
         for epoch in range(config.epochs):
             total_loss = train_loop(train_dataloader, model, optimizer, lr_scheduler, epoch, config)
             loss.append(total_loss)
-            P, R, F1 = test_loop(val_dataloader, model, mode='validat')
+            P, R, F1 = test_loop(config, val_dataloader, model, mode='validat')
             
             if np.mean(F1) > best_f1:
                 best_f1 = np.mean(F1)
@@ -94,7 +99,7 @@ def k_folds(config):
         losses.append(loss)
         
         # ---------------------------validation-----------------------------
-        P, R, F1 = test_loop(val_dataloader, model, mode='validat')
+        P, R, F1 = test_loop(config, val_dataloader, model, mode='validat')
         averaged_p = np.mean(P)
         averaged_r = np.mean(R)
         averaged_f1 = np.mean(F1)
@@ -128,7 +133,7 @@ def k_folds(config):
     test_dataloader = Dataloader(config, test_dataset)
     model.load_state_dict(torch.load(save_path+'_weights.bin'))
     model = model.to(config.device)
-    P, R, F1 = test_loop(test_dataloader, model, mode='test')    
+    P, R, F1 = test_loop(config, test_dataloader, model, mode='test')    
     print(f'test averaged: precision: {np.mean(P)},  recall: {np.mean(R)},  F1 score: {np.mean(F1)}')    
         
     print('Done')

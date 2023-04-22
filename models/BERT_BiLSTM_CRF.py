@@ -44,6 +44,7 @@ class Model(nn.Module):
         logits = self.linear(sequence_output)
         # logits: (batch_size, seq_len, LABEL_SIZE)
         if label_ids != None:
+            label_ids = torch.where(label_ids == -100, 0, label_ids)
             loss = self.crf(logits, label_ids, att_mask)
         return loss*(-1)  
 
