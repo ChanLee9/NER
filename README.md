@@ -28,9 +28,10 @@
 
 # 实验结果
 记号如下
-- L: LSTM
-- B: BERT
-- C: CRF
+- A: Augmented data
+- L: LSTM model
+- B: BERT model
+- C: CRF module
 - D: dynamic merging
 - M: multi-head attention layer
 1. 模型优化部分
