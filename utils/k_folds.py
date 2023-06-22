@@ -54,7 +54,7 @@ def k_folds(config):
         save_path = os.path.join('data', config.model)
     os.makedirs(save_path, exist_ok=True)
     start_time = time.time()
-    best_f1 = 0.
+    best_f1 = 0.5
     losses, Ps, Rs, F1s = [], [], [], []
     averaged = [[], [], []]     # p, r, f1
     for i in range(config.k_folds):
@@ -66,14 +66,14 @@ def k_folds(config):
         val_dataset = Dataset(config, val_data)
         train_dataloader = Dataloader(config, train_dataset).dataloader
         val_dataloader = Dataloader(config, val_dataset).dataloader
-        if config.use_lora:
+        if config.use_lora and "LORA" in config.model:
             print('using lora...\n')
             lora.mark_only_lora_as_trainable(model)
             # 把 lstm和crf中的参数设置为可学习
             unfreeze_params(model)
         if config.use_amp:
             print('using amp...\n')
-        if config.use_grad_accumulat:
+        if config.grad_accumulation != 1:
             print('using gradient accumulating...\n')
             
         # 查看模型可训练参数量
@@ -89,20 +89,20 @@ def k_folds(config):
         for epoch in range(config.epochs):
             total_loss = train_loop(train_dataloader, model, optimizer, lr_scheduler, epoch, config)
             loss.append(total_loss)
-            P, R, F1 = test_loop(config, val_dataloader, model, mode='validat')
+            res, res_with_o = test_loop(config, val_dataloader, model, mode='validat')
             
-            if np.mean(F1) > best_f1:
-                best_f1 = np.mean(F1)
+            if np.mean(res[2]) > best_f1:
+                best_f1 = np.mean(res[2])
                 print('saving weights...\n')
                 torch.save(model.state_dict(), os.path.join(save_path, config.model + '_weights.bin'))
                 
         losses.append(loss)
         
         # ---------------------------validation-----------------------------
-        P, R, F1 = test_loop(config, val_dataloader, model, mode='validat')
-        averaged_p = np.mean(P)
-        averaged_r = np.mean(R)
-        averaged_f1 = np.mean(F1)
+        res, res_with_o = test_loop(config, val_dataloader, model, mode='validat')
+        averaged_p = np.mean(res[0])
+        averaged_r = np.mean(res[1])
+        averaged_f1 = np.mean(res[2])
         
         if averaged_f1 > best_f1:
             best_f1 = averaged_f1
@@ -111,9 +111,10 @@ def k_folds(config):
             torch.save(model.state_dict(), save_path+'_weights.bin')
         print(f'validation averaged: precision: {averaged_p},  recall: {averaged_r},  F1 score: {averaged_f1}')
         
-        F1s.append(F1)
-        Ps.append(P)
-        Rs.append(R)
+        Ps.append(res[0])
+        Rs.append(res[1])
+        F1s.append(res[2])
+        
         averaged[0].append(averaged_p)
         averaged[1].append(averaged_r)
         averaged[2].append(averaged_f1)
