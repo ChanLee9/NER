@@ -1,6 +1,8 @@
 python main.py \
---model D_BERT_BiLSTM_CRF \
---device cuda:2 \
---use_lora 1 \
---use_amp 1 \
---use_grad_accumulat 1 
+--model BiLSTM_CRF \
+--device cuda:0 \
+--lr 3e-3 \
+--epochs 5
+# --use_lora \
+# --use_amp \
+# --grad_accumulation 15
