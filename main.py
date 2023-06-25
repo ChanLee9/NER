@@ -15,7 +15,7 @@ def get_args():
     parser.add_argument('--dropout', type=float, default=0.2, help='dropout rate')
     parser.add_argument('--hidden_size', type=int, default=256, help='hidden size in lstm model')
     parser.add_argument('--epochs', type=int, default=10, help='number of epochs')
-    parser.add_argument('--batch_size', type=int, default=12, help='batch size')
+    parser.add_argument('--batch_size', type=int, default=16, help='batch size')
     parser.add_argument('--train_path', type=str, default='data/train.csv', help='default: data/train.csv, can be changed to data/augmented.csv')
     parser.add_argument('--test_path', type=str, default='data/test.csv')
     parser.add_argument('--lr', type=float, default=2e-5, help='learning rate')
@@ -27,6 +27,4 @@ def get_args():
 
 if __name__ == '__main__':
     args = get_args()
-    if args.k_folds == -1:
-        pass
     k_folds(args)

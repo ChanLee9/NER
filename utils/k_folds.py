@@ -54,7 +54,7 @@ def k_folds(config):
         save_path = os.path.join('data', config.model)
     os.makedirs(save_path, exist_ok=True)
     start_time = time.time()
-    best_f1 = 0.5
+    best_f1 = 0.4
     losses, Ps, Rs, F1s = [], [], [], []
     averaged = [[], [], []]     # p, r, f1
     for i in range(config.k_folds):
@@ -121,10 +121,10 @@ def k_folds(config):
         
     
     # -------------------------------visualising-------------------------------
-    visualize_loss(losses, save_path)
-    visualize_p_r_f1(F1s, 'F1 score', save_path)
-    visualize_p_r_f1(Ps, 'Precision', save_path)
-    visualize_p_r_f1(Rs, 'Recall', save_path)
+    visualize_loss(losses, save_path, config.k_folds)
+    visualize_p_r_f1(F1s, 'F1 score', save_path, config.k_folds)
+    visualize_p_r_f1(Ps, 'Precision', save_path, config.k_folds)
+    visualize_p_r_f1(Rs, 'Recall', save_path, config.k_folds)
     print(f'validation final averaged: precision: {np.mean(averaged[0])}, recall: {np.mean(averaged[1])}, f1 score: {np.mean(averaged[2])}')
     
 
