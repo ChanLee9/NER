@@ -66,7 +66,7 @@ def k_folds(config):
         val_dataset = Dataset(config, val_data)
         train_dataloader = Dataloader(config, train_dataset).dataloader
         val_dataloader = Dataloader(config, val_dataset).dataloader
-        if config.use_lora:
+        if config.use_lora and "LORA" in config.model:
             print('using lora...\n')
             lora.mark_only_lora_as_trainable(model)
             # 把 lstm和crf中的参数设置为可学习
