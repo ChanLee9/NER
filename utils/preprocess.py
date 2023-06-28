@@ -1,4 +1,5 @@
 import pandas as pd
+import torch
 
 class DataProcessor(object):
     def __init__(self, config) -> None:
@@ -12,6 +13,8 @@ class DataProcessor(object):
         Args:
             keep_ori (bool, optional): 是否保留原来的句子. Defaults to False.
             split_symbols (_type_, optional): 分割符. Defaults to None.
+        Return:
+            data: pandas.Dataframe
         """
         drop_list = []
 
@@ -58,3 +61,15 @@ class DataProcessor(object):
             data = data.drop(drop_list)
         
         return data  
+    
+    def split_train_test_data(self, raw_data):
+        """_summary_
+            根据生成的数据获取训练集和测试集
+        Args:
+            raw_data (_type_): pandas.Dataframe
+        Return:
+            train_data, val_data, test_data
+        """
+        
+        
+        
