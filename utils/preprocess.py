@@ -70,6 +70,4 @@ class DataProcessor(object):
         Return:
             train_data, val_data, test_data
         """
-        
-        
-        
+        pass

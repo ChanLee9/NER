@@ -20,6 +20,7 @@ def get_args():
     parser.add_argument('--test_path', type=str, default='data/test.csv')
     parser.add_argument('--lr', type=float, default=2e-5, help='learning rate')
     parser.add_argument('--lora_r', type=int, help='choose lora r to implement')
+    parser.add_argument('--span', type=int, default=64, help='length to cut in preprocess')
     parser.add_argument('--k_folds', type=int, default=5, help='choose K to split train data, -1 to not use k_folds')
     args = parser.parse_args()
     return args
