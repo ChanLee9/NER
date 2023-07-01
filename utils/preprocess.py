@@ -1,9 +1,7 @@
 import os
+import json
 import pandas as pd
 import random
-import json
-# from sklearn.model_selection import train_test_split
-# from sklearn.model_selection import KFold
 
 from dataclasses import dataclass
 
@@ -14,33 +12,33 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 class DataProcessor(object):
     """
     1. 读取原始数据
     2. 进行数据增强，获取实体字典
     3. 将长句子分割为短句子
     """
+
     def __init__(self, config) -> None:
         self.data_path = config.data_path
         self.raw_data = self.get_raw_data()
 
         self.span = config.span
         self.save_path = config.save_path
-        self.k_folds = config.k_folds
-        
-        # self.data = self.split_long_texts()
+
         self.augmentation_level = config.augmentation_level
         self.split_symbols = [",", ".", "?", "!", "，", "。", "？", "！"]
-    
+
     def get_raw_data(self):
         """
         读取原始数据，把BIO_anno列改成列表
         """
         raw_data = pd.read_csv(self.data_path)
-        raw_data["BIO_anno"] = raw_data["BIO_anno"].apply(lambda x:x.split(" "))
+        raw_data["BIO_anno"] = raw_data["BIO_anno"].apply(
+            lambda x: x.split(" "))
         return raw_data
 
-    
     def add_data_in_the_end(self, text, anno):
         """
         将生成的数据添加到原始数据最后，新增数据的class设为-1
@@ -49,11 +47,11 @@ class DataProcessor(object):
             anno (_type_): 新增text对应的BIO_anno
         """
         new_row = pd.DataFrame({
-                            "id": [len(self.raw_data)],
-                            "text": [text],
-                            "BIO_anno": [anno],
-                            "class": [-1]
-                        })
+            "id": [len(self.raw_data)],
+            "text": [text],
+            "BIO_anno": [anno],
+            "class": [-1]
+        })
         self.raw_data = pd.concat([self.raw_data, new_row], ignore_index=True)
 
     def data_augmentation(self):
@@ -66,22 +64,24 @@ class DataProcessor(object):
         4 表示融合前三种增强方式
         """
         logger.info(f"data augmentation level: {self.augmentation_level}")
-        
+
         if self.augmentation_level == 0:
-            logger.info(f"data augmentation level is {self.augmentation_level}, so there won't be any augmentations...")
-            return 
+            logger.info(
+                f"data augmentation level is {self.augmentation_level}, so there won't be any augmentations...")
+            return
         elif self.augmentation_level == 1:
             self.add_sep()
-            return 
+            return
         elif self.augmentation_level == 2:
             self.del_char()
-            return 
+            return
         elif self.augmentation_level == 3:
             entity_dict = self.get_entity_dict()
             self.replace_entity(entity_dict)
-            return 
+            return
         elif self.augmentation_level == 4:
-            logger.info(f"data augmentation level is {self.augmentation_level}, so there will be 3 different types of data augmentation...")
+            logger.info(
+                f"data augmentation level is {self.augmentation_level}, so there will be 3 different types of data augmentation...")
             self.add_sep()
             self.del_char()
             entity_dict = self.get_entity_dict()
@@ -95,67 +95,58 @@ class DataProcessor(object):
         以0.1的概率选取样本，然后在随机位置插入随机分隔符
         """
         logger.info("randomly adding sep...")
-        
+
         for idx, item in self.raw_data.iterrows():
             # 以0.1的概率选取样本
-            
             rand_num = random.random()
-            # print(rand_num)
             if rand_num < 0.1 and item["class"] != -1:
                 text, anno = item["text"], item["BIO_anno"]
+
                 # 随机选取插入的字符
-                
                 sep = random.choice(self.split_symbols)
+
                 # 我们只在某个字符后面插入，因此最多遍历到倒数第二个字符
-                
                 for i in range(len(text) - 1):
                     rand_num = random.random()
-                    # print(rand_num)
-                    # breakpoint()
+
                     # 以2/len(text)的概率插入一个字符在第i个字符后面，并且这个字符不能是实体，否则可能会破坏原有实体信息
                     # 这样需要注意一个问题：如果这个句子里面 "O" 的占比很高，那么我们可能会对这个一个样本加很多次，这样会导致 "O" 的占比更高
                     # 因此我们需要考虑整个句子的长度，用2/len(text)来大致控制增加的样本数为2
-                    
                     if rand_num < 2/len(text) and anno[i] == "O":
                         new_text = text[:i] + sep + text[i:]
                         new_anno = anno[:i] + ["O"] + anno[i:]
-                        # print(new_text)
-                        # print(new_anno)
                         self.add_data_in_the_end(new_text, new_anno)
-                        # breakpoint()
-    
+
     def del_char(self):
         """
         以0.1的概率随机地删除一些非实体字符
         """
         logger.info("randomly deleting chars...")
-        
+
         for idx, item in self.raw_data.iterrows():
             # 以0.1的概率选取样本
-            
             rand_num = random.random()
             if rand_num < 0.1 and item["class"] != -1:
                 text, annotations = item["text"], item["BIO_anno"]
-                
                 for i in range(len(text)):
+
                     # 以0.1的概率删除第i个非实体的字符，和增加分割符同样的思想，我们对于每个选中的样本，我们大致增加两个新的样本
-                    
                     rand_num = random.random()
                     if rand_num < 2/len(text) and annotations[i] == "O":
                         new_text = text[:i] + text[i+1:]
-                        new_anno = annotations[:i]+ annotations[i+1:]
+                        new_anno = annotations[:i] + annotations[i+1:]
                         self.add_data_in_the_end(new_text, new_anno)
-                   
+
     def get_entity_dict(self):
         """
         获得raw_data的实体分布, 并按照实体类别将其分类，如PRODUCT, COMMENT...
         然后把每一个类别的实体再根据实体长度分类
-        """   
+        """
         logger.info("getting entity dict...")
 
         from collections import defaultdict
         entity_dict = {}
-        
+
         for idx, item in self.raw_data.iterrows():
             if item["class"] == -1:
                 continue
@@ -163,41 +154,42 @@ class DataProcessor(object):
             i = 0
             while i < len(anno):
                 # 如果第i个字符是某个实体开头，那么我们把这个实体放进实体字典中
-                
                 if anno[i] != "O":
+
                     # 去掉 "B-"
-                    
                     entity = anno[i][2:]
                     j = i + 1
+
                     # 这样可以确保同一个实体被分到一起，避免连续不同的实体被分到一起
-                    
                     while j < len(anno) and anno[j] == f"I-{entity}":
                         j += 1
+                        
                     # 按照实体长度和实体类型将其放入到实体字典中
-                    
                     if entity not in entity_dict:
                         entity_dict[entity] = defaultdict(list)
-                        
                     len_dict = entity_dict[entity]
                     if text[i:j] not in len_dict[j-i]:
                         len_dict[j-i].append(text[i:j])
+
                     # 跳过这个实体
-                    
                     i = j
+
                 i += 1
+
         # 把这个实体字典按照实体长度排序，然后保存起来,方便以后查看
         entity_dict = {
-            entity: dict(sorted(len_entity.items(), key=lambda x:x[0])) \
-                for entity, len_entity in entity_dict.items()
+            entity: dict(sorted(len_entity.items(), key=lambda x: x[0]))
+            for entity, len_entity in entity_dict.items()
         }
         os.makedirs(self.save_path, exist_ok=True)
         with open(os.path.join(self.save_path, "entity_dict.json"), "w") as f:
             json.dump(entity_dict, f, ensure_ascii=False, indent=4)
-        
-        logger.info(f"entity dict saved in {os.path.join(self.save_path, 'entity_dict.json')}.")
-        
+
+        logger.info(
+            f"entity dict saved in {os.path.join(self.save_path, 'entity_dict.json')}.")
+
         return entity_dict
-    
+
     def replace_entity(self, entity_dict):
         """
         根据实体字典来寻找替换的实体, 以0.2的概率选取样本
@@ -215,55 +207,58 @@ class DataProcessor(object):
             }
         """
         logger.info("replacing entities...")
-        
+
         for idx, item in self.raw_data.iterrows():
             rand_num = random.random()
+
             # 以0.2的概率选取要替换的样本
-            
             if rand_num < 0.2 and item["class"] != -1:
                 text, anno = item["text"], item["BIO_anno"]
                 i = 0
                 while i < len(anno):
+
                     # 寻找实体
-                    
                     if anno[i][:2] == "B-":
+
                         # 获取当前实体
-                        
                         entity = anno[i][2:]
                         j = i
                         while j < len(anno) and anno[j] == f"I-{entity}":
                             j += 1
+
                         # 决定是否替换当前实体
-                        
                         rand_num = random.random()
+
                         # 只有0.3的概率会替换当前实体
-                        
                         if rand_num < 0.3:
                             cur_entity_dict = entity_dict[entity]
+                            
                             # 如果存在和当前实体长度相同的其他同类型实体，则从中随机选取一个进行替换
-
                             if j-i in cur_entity_dict:
-                                replaced_entity = random.choice(cur_entity_dict[j-i])
-                                new_text = text[:i] + replaced_entity + text[j:]
+                                replaced_entity = random.choice(
+                                    cur_entity_dict[j-i])
+                                new_text = text[:i] + \
+                                    replaced_entity + text[j:]
                                 self.add_data_in_the_end(new_text, anno)
                             else:
                                 # 如果没有和当前实体长度相同的同类型实体，那么我们随机抽一个与当前实体类型相同的其他长度的实体
-                                rand_len = random.choice(list(cur_entity_dict.keys()))
-                                replaced_entity = random.choice(cur_entity_dict[rand_len])
-                                new_text = text[:i] + replaced_entity + text[j:]
-                                new_anno = anno[:i] + [f"B-{entity}"] + [f"I-{entity}"] * (rand_len - 1) + anno[j:]
-                                # if len(new_text) != len(new_anno):
-                                #     breakpoint()
+                                rand_len = random.choice(
+                                    list(cur_entity_dict.keys()))
+                                replaced_entity = random.choice(
+                                    cur_entity_dict[rand_len])
+                                new_text = text[:i] + \
+                                    replaced_entity + text[j:]
+                                new_anno = anno[:i] + [f"B-{entity}"] + \
+                                    [f"I-{entity}"] * (rand_len - 1) + anno[j:]
                                 self.add_data_in_the_end(new_text, new_anno)
 
                     i += 1
-        
+
     def split_long_texts(self, keep_ori=False):
         """_summary_
             用快慢指针来定位应该分割的位置，快指针领先一个分割符，slow < span < fast
         Args:
             keep_ori (bool, optional): 是否保留原来的句子. Defaults to False.
-            split_symbols (_type_, optional): 分割符. Defaults to None.
         Return:
             data: pandas.Dataframe
         """
@@ -304,24 +299,7 @@ class DataProcessor(object):
         if not keep_ori:
             self.raw_data = self.raw_data.drop(drop_list)
 
-        return 
-
-    # def generate_data_for_kfolds(self):
-    #     """_summary_
-    #         根据生成的数据获取训练集和测试集
-    #     Args:
-    #         raw_data (_type_): pandas.Dataframe
-    #     Return:
-    #         induces: k-折交叉验证的train, val index
-    #         test: 测试集
-    #     """
-    #     train, test = train_test_split(self.raw_data, test_size=0.2)
-    #     kfold = KFold(n_splits=self.k_folds, shuffle=True, random_state=42)
-    #     induces = kfold.split(train)
-        
-    #     return induces, test
-    
-    
+        return
 
 
 if __name__ == "__main__":
@@ -330,21 +308,22 @@ if __name__ == "__main__":
         span = 64
         data_path = "../data/train_data_public.csv"
         save_path = "../save_dir"
-        k_folds = 5
         augmentation_level = 4
 
     config = Config()
     data_processer = DataProcessor(config)
     raw_data = data_processer.raw_data
     data_processer.data_augmentation()
-    print(f"class distribution before: {data_processer.raw_data['class'].value_counts()}")
+    print(
+        f"class distribution before: {data_processer.raw_data['class'].value_counts()}")
     for idx, item in data_processer.raw_data.iterrows():
         if len(item["text"]) != len(item["BIO_anno"]):
             print(f"{idx}, not equal length")
         if len(item["text"]) >= 64:
             print(f"{idx}, length over 64")
     data_processer.split_long_texts()
-    print(f"class distribution after: {data_processer.raw_data['class'].value_counts()}")
+    print(
+        f"class distribution after: {data_processer.raw_data['class'].value_counts()}")
     for idx, item in data_processer.raw_data.iterrows():
         if len(item["text"]) != len(item["BIO_anno"]):
             print(f"{idx}, not equal length")
