@@ -9,6 +9,24 @@ import os
 import loralib as lora
 from importlib import import_module
 
+
+
+    # def generate_data_for_kfolds(self):
+    #     """_summary_
+    #         根据生成的数据获取训练集和测试集
+    #     Args:
+    #         raw_data (_type_): pandas.Dataframe
+    #     Return:
+    #         induces: k-折交叉验证的train, val index
+    #         test: 测试集
+    #     """
+    #     train, test = train_test_split(self.raw_data, test_size=0.2)
+    #     kfold = KFold(n_splits=self.k_folds, shuffle=True, random_state=42)
+    #     induces = kfold.split(train)
+        
+    #     return induces, test
+
+
 def get_train_val(i, config):       # 第i轮
     data = pd.read_csv(config.train_path)
     total_len = len(data)

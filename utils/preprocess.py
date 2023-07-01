@@ -237,8 +237,14 @@ class DataProcessor(object):
                             if j-i in cur_entity_dict:
                                 replaced_entity = random.choice(
                                     cur_entity_dict[j-i])
-                                new_text = text[:i] + \
-                                    replaced_entity + text[j:]
+
+                                # 处理边界情况，j 可能是最后一个字符
+                                if j == len(anno):
+                                    new_text = text[:i] + \
+                                    replaced_entity
+                                else:
+                                    new_text = text[:i] + \
+                                        replaced_entity + text[j:]
                                 self.add_data_in_the_end(new_text, anno)
                             else:
                                 # 如果没有和当前实体长度相同的同类型实体，那么我们随机抽一个与当前实体类型相同的其他长度的实体
@@ -329,3 +335,4 @@ if __name__ == "__main__":
             print(f"{idx}, not equal length")
         if len(item["text"]) >= 64:
             print(f"{idx}, length over 64")
+    
