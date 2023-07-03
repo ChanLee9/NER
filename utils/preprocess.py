@@ -305,6 +305,7 @@ class DataProcessor(object):
         if not keep_ori:
             self.raw_data = self.raw_data.drop(drop_list)
 
+        self.raw_data.reset_index(drop=True, inplace=True)
         return
 
 
