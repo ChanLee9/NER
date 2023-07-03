@@ -136,7 +136,8 @@ class MyDataLoader():
                 token_start, token_end = encoding.char_to_token(char_start), encoding.char_to_token(char_end-1)
                 labels[idx][token_start] = self.label2id[f"B-{entity}"]
                 labels[idx][token_start+1:token_end+1] = self.label2id[f"I-{entity}"]
-        return texts, annos, entities, texts_encoding, labels, starts, ends
+                
+        return texts_encoding, labels, starts, ends
     
                 
     def get_dataloader(self):
