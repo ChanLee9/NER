@@ -1,4 +1,5 @@
 from utils.k_folds import k_folds
+from utils.preprocess import DataProcessor
 import argparse
 
 def get_args():
@@ -18,6 +19,7 @@ def get_args():
     parser.add_argument('--batch_size', type=int, default=16, help='batch size')
     parser.add_argument('--train_path', type=str, default='data/train.csv', help='default: data/train.csv, can be changed to data/augmented.csv')
     parser.add_argument('--test_path', type=str, default='data/test.csv')
+    parser.add_argument('--test_size', type=float, default=0.2, help='test size when split train data, should be in (0, 1)')
     parser.add_argument('--lr', type=float, default=2e-5, help='learning rate')
     parser.add_argument('--lora_r', type=int, help='choose lora r to implement')
     parser.add_argument('--data_path', type=str, default="data/train_data_public.csv", help='data path')
@@ -29,4 +31,11 @@ def get_args():
 
 if __name__ == '__main__':
     args = get_args()
-    k_folds(args)
+    
+    # preprocess
+    data_processer = DataProcessor(args)
+    data_processer.data_augmentation()
+    data_processer.split_long_texts()
+    data = data_processer.raw_data
+    
+    k_folds(args, data)

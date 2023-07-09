@@ -3,6 +3,7 @@ import json
 import pandas as pd
 import random
 
+from sklearn.model_selection import KFold, train_test_split
 from dataclasses import dataclass
 
 import logging
@@ -55,13 +56,15 @@ class DataProcessor(object):
         self.raw_data = pd.concat([self.raw_data, new_row], ignore_index=True)
 
     def data_augmentation(self):
-        """
-        根据增强等级来确定数据增强方式：
-        0 表示不增强
-        1 表示随机地填充一些分隔符
-        2 表示随机地删除一些字符
-        3 表示随机地替换一些相同长度的实体
-        4 表示融合前三种增强方式
+        """根据增强等级来确定数据增强方式：
+            0: 表示不增强
+            1: 表示随机地填充一些分隔符
+            2: 表示随机地删除一些字符
+            3: 表示随机地替换一些相同长度的实体
+            4: 表示融合前三种增强方式
+
+        Raises:
+            NotImplementedError: _description_
         """
         logger.info(f"data augmentation level: {self.augmentation_level}")
 
@@ -316,6 +319,7 @@ if __name__ == "__main__":
         data_path = "../data/train_data_public.csv"
         save_path = "../save_dir"
         augmentation_level = 4
+        k_folds = 5
 
     config = Config()
     data_processer = DataProcessor(config)
@@ -323,11 +327,11 @@ if __name__ == "__main__":
     data_processer.data_augmentation()
     print(
         f"class distribution before: {data_processer.raw_data['class'].value_counts()}")
-    for idx, item in data_processer.raw_data.iterrows():
-        if len(item["text"]) != len(item["BIO_anno"]):
-            print(f"{idx}, not equal length")
-        if len(item["text"]) >= 64:
-            print(f"{idx}, length over 64")
+    # for idx, item in data_processer.raw_data.iterrows():
+    #     if len(item["text"]) != len(item["BIO_anno"]):
+    #         print(f"{idx}, not equal length")
+    #     if len(item["text"]) >= 64:
+    #         print(f"{idx}, length over 64")
     data_processer.split_long_texts()
     print(
         f"class distribution after: {data_processer.raw_data['class'].value_counts()}")
@@ -336,4 +340,27 @@ if __name__ == "__main__":
             print(f"{idx}, not equal length")
         if len(item["text"]) >= 64:
             print(f"{idx}, length over 64")
+            
+    def generate_data_for_kfolds(data, test_size=0.2):
+        """_summary_
+            根据生成的数据获取训练集和测试集
+        Args:
+            raw_data (_type_): pandas.Dataframe
+        Return:
+            induces: k-折交叉验证的train, val index
+            test: 测试集
+        """
+        train, test = train_test_split(data, test_size=test_size)
+        kfold = KFold(n_splits=config.k_folds, shuffle=True, random_state=42)
+        induces = kfold.split(train)
+        
+        return induces, test
+
+    induces, test = generate_data_for_kfolds(data_processer.raw_data)
+    test.reset_index(drop=True, inplace=True)
+    for idx, item in enumerate(induces):
+        train_data, val_data = data_processer.raw_data.iloc[item[0]], data_processer.raw_data.iloc[item[1]]
+        train_data, val_data = train_data.reset_index(drop=True), val_data.reset_index(drop=True)
+        breakpoint()
+    
     

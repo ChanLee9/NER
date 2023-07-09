@@ -95,8 +95,7 @@ class MyDataLoader():
         self.tokenizer = AutoTokenizer.from_pretrained(config.model_name_or_path)
     
     def collate_fn(self, batch):
-        # 把batch中的数据按照长度排序，以便添加padding
-        # batch: (text, anno, label)
+        # 把batch中的数据按照长度排序，以便添加padding, batch: (text, anno, label)
         batch.sort(key=lambda x: len(x[0]), reverse=True)    
         texts, annos, entities, starts, ends = [], [], [], [], []
         for item in batch:
@@ -132,6 +131,7 @@ class MyDataLoader():
             # 将 labels 其余部分转化成 id
             for item in entities[idx]:
                 entity, char_start, char_end = item[1], item[2], item[3]
+                
                 # 通过char_start和char_end找到对应的token_start和token_end
                 token_start, token_end = encoding.char_to_token(char_start), encoding.char_to_token(char_end-1)
                 labels[idx][token_start] = self.label2id[f"B-{entity}"]
