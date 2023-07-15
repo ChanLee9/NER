@@ -1,16 +1,20 @@
-from .training import train_loop, get_optimizer, test_loop
-from .utils import MyDataLoader, MyDataset
+import time
+import os
+import logging
+from importlib import import_module
 from sklearn.model_selection import KFold, train_test_split
 import torch
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import time
-import os
-import loralib as lora
-from importlib import import_module
 
-import logging
+import loralib as lora
+
+
+from .training import train_loop, get_optimizer, test_loop
+from .utils import MyDataLoader, MyDataset
+
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
@@ -121,8 +125,8 @@ def k_folds(config, data):
         
         if config.use_lora:
             logger.info('using lora...\n')
-            for layer in model.lora.layers:
-                layer.train()
+            for layer in model.bert.encoder.layer:
+                layer.attention.
             lora.mark_only_lora_as_trainable(model)
             # 把 lstm和crf中的参数设置为可学习
             unfreeze_params(model)
