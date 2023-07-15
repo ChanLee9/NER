@@ -156,16 +156,10 @@ def k_folds(config, data):
             else:
                 raise NotImplementedError
             
-        if config.use_amp:
-            print('using amp...\n')
-        if config.grad_accumulation != 1:
-            print('using gradient accumulating...\n')
-            
         # 查看模型可训练参数量
         trainable_params = print_trainable_params(model)
-        print(f'trainable parameters: {trainable_params}')      
                 
-        if i == 0:
+        if idx == 0:
             print(f'-------------------------Using { config.model } model----------------------------')
         optimizer, lr_scheduler = get_optimizer(model, train_dataloader, config)
         
