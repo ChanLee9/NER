@@ -71,11 +71,13 @@ def unfreeze_params(model):
     Args:
         model (_type_): _description_
     """
-    for _, params in model.lstm.named_parameters():
-        params.requires_grad = True
+    if hasattr(model, 'lstm'):
+        for _, params in model.lstm.named_parameters():
+            params.requires_grad = True
     
-    for _, params in model.crf.named_parameters():
-        params.requires_grad = True
+    if hasattr(model, 'crf'):
+        for _, params in model.crf.named_parameters():
+            params.requires_grad = True
 
 def print_trainable_params(model):
     """打印模型可训练参数量占比
@@ -87,8 +89,9 @@ def print_trainable_params(model):
     total_params = sum([p.numel() for p in model.parameters()])
     trainable_params = sum([p.numel() for p in model.parameters() if p.requires_grad])
     trainable_ratio = trainable_params / total_params
-    logger.info(f'total parameters: {total_params} | trainable parameters: {trainable_params} | \
+    logger.info(f'total parameters: {total_params} || trainable parameters: {trainable_params} || \
                 trainable ratio: {100*trainable_ratio:.2f}%')
+    
 
 def k_folds(config, data):
     """
@@ -125,21 +128,38 @@ def k_folds(config, data):
         
         if config.use_lora:
             logger.info('using lora...\n')
-            for layer in model.bert.encoder.layer:
-                layer.attention.
-            lora.mark_only_lora_as_trainable(model)
-            # 把 lstm和crf中的参数设置为可学习
-            unfreeze_params(model)
-        if config.use_amp:
-            print('using amp...\n')
-        if config.grad_accumulation != 1:
-            print('using gradient accumulating...\n')
+            if "BERT" in config.model:
+                model_dim = model.bert.embeddings.word_embeddings.embedding_dim
+
+                # 默认把lora模块应用到 kqvo 中
+                for layer in model.bert.encoder.layer:
+                    layer.attention.self.query = lora.Linear(model_dim, model_dim, r=config.lora_r)
+                    layer.attention.self.key = lora.Linear(model_dim, model_dim, r=config.lora_r)
+                    layer.attention.self.value = lora.Linear(model_dim, model_dim, r=config.lora_r)
+                    layer.attention.output.dense = lora.Linear(model_dim, model_dim, r=config.lora_r)
+                    
+                lora.mark_only_lora_as_trainable(model)
+                
+                # 把 lstm和crf中的参数设置为可学习
+                unfreeze_params(model)
+            elif "GPT" in config.model:
+                model_dim = model.gpt.wte.embedding_dim
+                
+                # 默认把lora模块应用到 attn.c_attn、attn.c_proj、mlp.c_fc和mlp.c_proj 中
+                for layer in model.gpt.transformer.h:
+                    layer.attn.c_attn = lora.Conv1d(model_dim, model_dim, kerner_size=1, r=config.lora_r)
+                    layer.attn.c_proj = lora.Conv1d(model_dim, model_dim, kerner_size=1, r=config.lora_r)
+                    layer.mlp.c_fc = lora.Conv1d(model_dim, model_dim, kerner_size=1, r=config.lora_r)
+                    layer.mlp.c_proj = lora.Conv1d(model_dim, model_dim, kerner_size=1, r=config.lora_r)
+                
+                lora.mark_only_lora_as_trainable(model)
+            else:
+                raise NotImplementedError
             
         # 查看模型可训练参数量
-        trainable_params = get_trainable_params(model)
-        print(f'trainable parameters: {trainable_params}')      
+        trainable_params = print_trainable_params(model)
                 
-        if i == 0:
+        if idx == 0:
             print(f'-------------------------Using { config.model } model----------------------------')
         optimizer, lr_scheduler = get_optimizer(model, train_dataloader, config)
         
