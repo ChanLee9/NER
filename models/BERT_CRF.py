@@ -11,7 +11,7 @@ class Model(nn.Module):
         
         self.bert = BertModel.from_pretrained(self.config.pretrained_model_path)
         self.dropout = nn.Dropout(self.config.dropout)
-        self.linear = nn.Linear(1024, self.config.label_size)
+        self.linear = nn.Linear(self.bert.config.hidden_size, self.config.label_size)
         self.crf = CRF(self.config.label_size, batch_first=True)
         
     def forward(self, input_ids, label_ids, mask):

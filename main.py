@@ -1,4 +1,5 @@
 from utils.k_folds import k_folds
+from utils.preprocess import DataProcessor
 import argparse
 
 def get_args():
@@ -9,15 +10,16 @@ def get_args():
     parser.add_argument('--use_lora', action='store_true', help='whether to use lora module')
     parser.add_argument('--use_amp', action='store_true', help='whether to use amp to acclerate training')
     parser.add_argument('--grad_accumulation', type=int, default=1, help='whether to use gradient accumulate')
-    parser.add_argument('--pretrained_model_path', type=str, default='pretrained_models/bert-large-chinese', help='path to pretrained models')
+    parser.add_argument('--model_name_or_path', type=str, default='pretrained_models/bert-large-chinese', help='path to pretrained models')
     parser.add_argument('--label_size', type=int, default=9, help='number of labels')
-    parser.add_argument('--max_length', type=int, default=256, help='max length to tokenize sentences')
+    parser.add_argument('--max_length', type=int, default=64, help='max length to tokenize sentences')
     parser.add_argument('--dropout', type=float, default=0.2, help='dropout rate')
     parser.add_argument('--hidden_size', type=int, default=256, help='hidden size in lstm model')
     parser.add_argument('--epochs', type=int, default=10, help='number of epochs')
     parser.add_argument('--batch_size', type=int, default=16, help='batch size')
     parser.add_argument('--train_path', type=str, default='data/train.csv', help='default: data/train.csv, can be changed to data/augmented.csv')
     parser.add_argument('--test_path', type=str, default='data/test.csv')
+    parser.add_argument('--test_size', type=float, default=0.2, help='test size when split train data, should be in (0, 1)')
     parser.add_argument('--lr', type=float, default=2e-5, help='learning rate')
     parser.add_argument('--lora_r', type=int, help='choose lora r to implement')
     parser.add_argument('--data_path', type=str, default="data/train_data_public.csv", help='data path')
@@ -29,4 +31,11 @@ def get_args():
 
 if __name__ == '__main__':
     args = get_args()
-    k_folds(args)
+    
+    # preprocess
+    data_processer = DataProcessor(args)
+    data_processer.data_augmentation()
+    data_processer.split_long_texts()
+    data = data_processer.raw_data
+    
+    k_folds(args, data)
