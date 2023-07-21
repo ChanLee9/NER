@@ -1,21 +1,16 @@
-import os
-import json
-import pandas as pd
+from transformers import AutoModel, AutoTokenizer
+from transformers import GPT2LMHeadModel, GPT2Tokenizer
 
-label_path = "data/label.txt"
+import torch
+import torch.nn as nn
 
-labels = pd.read_csv(label_path)
+model_name_or_path = "pretrained_models/bert-base-chinese"
+tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+model = AutoModel.from_pretrained(model_name_or_path)
+print(model)
 
-def cus_fun(x):
-    id = x["id"]
-    res = {
-                "entities": [],
-                "starts": [],
-                "ends": []
-            }
-    return res
-
-# print(labels)
-labels["test"] = labels.apply(lambda x:cus_fun(x), axis=1)
-
-print(labels)
+if __name__ =="__main__":
+    s = "你好，今天星期几？"
+    encodings = tokenizer(s, return_tensors="pt")
+    bert_output = model(**encodings, output_hidden_states=True)
+    breakpoint()

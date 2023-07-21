@@ -103,7 +103,7 @@ def k_folds(config, data):
     os.makedirs(save_path, exist_ok=True)
     
     induces, test_data = generate_data_for_kfolds(data, config)
-    test_data.reset_index(drop=True, replace=True)
+    test_data.reset_index(drop=True, inplace=True)
     
     start_time = time.time()
     best_f1 = 0.4
@@ -157,10 +157,10 @@ def k_folds(config, data):
                 raise NotImplementedError
             
         # 查看模型可训练参数量
-        trainable_params = print_trainable_params(model)
+        print_trainable_params(model)
                 
         if idx == 0:
-            print(f'-------------------------Using { config.model } model----------------------------')
+            logger.info(f'-------------------------Using { config.model } model----------------------------')
         optimizer, lr_scheduler = get_optimizer(model, train_dataloader, config)
         
         # -------------------------------training----------------------------
@@ -168,7 +168,7 @@ def k_folds(config, data):
         for epoch in range(config.epochs):
             total_loss = train_loop(train_dataloader, model, optimizer, lr_scheduler, epoch, config)
             loss.append(total_loss)
-            res, res_with_o = test_loop(config, val_dataloader, model, mode='validat')
+            res, res_with_o = test_loop(config, val_dataloader, model, mode='validating')
             
             if np.mean(res[2]) > best_f1:
                 best_f1 = np.mean(res[2])
@@ -178,7 +178,7 @@ def k_folds(config, data):
         losses.append(loss)
         
         # ---------------------------validation-----------------------------
-        res, res_with_o = test_loop(config, val_dataloader, model, mode='validat')
+        res, res_with_o = test_loop(config, val_dataloader, model, mode='validating')
         averaged_p = np.mean(res[0])
         averaged_r = np.mean(res[1])
         averaged_f1 = np.mean(res[2])
@@ -213,11 +213,9 @@ def k_folds(config, data):
     test_dataloader = Dataloader(config, test_dataset)
     model.load_state_dict(torch.load(save_path+'_weights.bin'))
     model = model.to(config.device)
-    P, R, F1 = test_loop(config, test_dataloader, model, mode='test')    
+    P, R, F1 = test_loop(config, test_dataloader, model, mode='testing')    
     print(f'test averaged: precision: {np.mean(P)},  recall: {np.mean(R)},  F1 score: {np.mean(F1)}')    
         
     print('Done')
     end_time = time.time()
     print(f'total time : {end_time - start_time}')
-
-print(11111)

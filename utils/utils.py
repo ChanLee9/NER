@@ -3,14 +3,14 @@ import torch.utils.data as data
 from transformers import AutoTokenizer
 import pandas as pd
 
-from preprocess import DataProcessor
+from .preprocess import DataProcessor
 from dataclasses import dataclass
 
 class MyDataset(data.Dataset):
     def __init__(self, raw_data, label_path=None) -> None:
         super().__init__()
         if label_path is None:
-            self.LABEL_PATH = "../data/label.txt"
+            self.LABEL_PATH = "data/label.txt"
         self.label2id = self.get_label_id_map()
         self.dataset = self.get_dataset(raw_data)
     
@@ -63,7 +63,6 @@ class MyDataset(data.Dataset):
             return res        
 
         data["labels"] = data.apply(lambda x: make_label(x), axis=1)
-
         return data
 
     def get_label_id_map(self):
@@ -88,6 +87,7 @@ class MyDataset(data.Dataset):
 class MyDataLoader():
     def __init__(self, config, dataset) -> None:
         super().__init__()
+        self.device = config.device
         self.dataset = dataset
         self.batch_size = config.batch_size
         self.max_length = config.max_length
@@ -136,9 +136,26 @@ class MyDataLoader():
                 token_start, token_end = encoding.char_to_token(char_start), encoding.char_to_token(char_end-1)
                 labels[idx][token_start] = self.label2id[f"B-{entity}"]
                 labels[idx][token_start+1:token_end+1] = self.label2id[f"I-{entity}"]
-                
-        return texts_encoding, labels, starts, ends
-    
+        
+        # 把starts和ends用-100填充到同一长度，
+        seq_len = texts_encoding['input_ids'].shape[1]
+        for row in range(len(starts)):
+            pad_len = seq_len - len(starts[row])
+            if pad_len > 0:
+                starts[row] += [-100] * pad_len
+                ends[row] += [-100] * pad_len 
+            else:
+                starts[row] = starts[row][:seq_len]
+                ends[row] = ends[row][:seq_len]
+            if len(starts[row]) != seq_len or len(ends[row]) != seq_len:
+                breakpoint()
+        item = {
+            "texts_encoding": texts_encoding.to(self.device),
+            "labels": torch.Tensor(labels).to(self.device),
+            "starts": torch.Tensor(starts).to(self.device),
+            "ends": torch.Tensor(ends).to(self.device)
+        }
+        return item
                 
     def get_dataloader(self):
         dataloader = data.DataLoader(

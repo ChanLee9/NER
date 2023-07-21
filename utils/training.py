@@ -20,48 +20,14 @@ def train_loop(dataloader, model, optimizer, lr_scheduler, epoch, config):     #
     total_loss = 0.
     progress_bar = tqdm(range(len(dataloader)))
     progress_bar.set_description(f'epoch: {epoch}, loss: {0:>4f}')
-    if config.use_amp:
-        scaler = torch.cuda.amp.GradScaler()
+    
     model.train()  
-    iter_num = config.grad_accumulation    # 梯度累计的更新频率
-    for batch, encodings in enumerate(dataloader):
-        if 'BERT' not in config.model:
-            input_ids = encodings[0]
-            label_ids = encodings[1]
-            mask = encodings[2]
-        else:
-            text_encoding = encodings[0]
-            label_ids = encodings[1]
-            input_ids = text_encoding['input_ids']
-            mask = text_encoding['attention_mask']        
-        if config.use_amp:
-            # 把计算loss过程中可以转化成混合精度的自动转换
-            with torch.cuda.amp.autocast():
-                loss = model.loss_fn(input_ids, label_ids, mask)
-                # scaler的作用是防止梯度过小，造成下溢出，导致无法更新参数。因此我们先放大再进行后向传播
-                scaler.scale(loss).backward()
-                # 梯度累计
-                if config.grad_accumulation:
-                    if (batch+1) % iter_num == 0:
-                        scaler.step(optimizer)
-                        lr_scheduler.step()
-                        scaler.update()
-                else:
-                    scaler.step(optimizer)
-                    lr_scheduler.step()
-                    scaler.update()
-                    
-        else:
-            loss = model.loss_fn(input_ids, label_ids, mask)
-            loss.backward()
-            if config.grad_accumulation:
-                if (batch+1)%iter_num == 0:
-                    optimizer.step()
-                    lr_scheduler.step()
-            else:
-                optimizer.step()
-                lr_scheduler.step()
-            
+    for batch, item in enumerate(dataloader):
+        loss = model.loss_fn(item)
+        loss.backward()
+        optimizer.step()
+        lr_scheduler.step()
+        
         optimizer.zero_grad()
         
         total_loss += loss.item()
@@ -70,24 +36,16 @@ def train_loop(dataloader, model, optimizer, lr_scheduler, epoch, config):     #
     return total_loss
 
 def test_loop(config, dataloader, model, mode):
-    assert mode in ['validat', 'test'], 'mode must be validation or test!'
-    print(f'-------------------------{mode}ing----------------------------')
+    progress_bar = tqdm(range(len(dataloader)))
+    progress_bar.set_description(f'{mode}... ')
     model.eval()
     Ps, Rs, F1s = [], [], []
     R_with_O, P_with_O, F1_with_O = [], [], []
     with torch.no_grad():
-        for batch, encodings in enumerate(dataloader):
-            if 'BERT' not in config.model:
-                input_ids = encodings[0]
-                label_ids = encodings[1]
-                mask = encodings[2]
-            else:
-                text_encoding = encodings[0]
-                label_ids = encodings[1]
-                input_ids = text_encoding['input_ids']
-                mask = text_encoding['attention_mask'] 
+        for batch, item in enumerate(dataloader):
             # y_pred的例子 ：[[1, 2, 3], [2, 3], [1]], 之所以长度不同是因为有mask的存在。长度递减是因为dataloader中按照长度给输入排序了。
-            y_pred = model(input_ids, label_ids, mask)
+            y_pred = model(item)
+            label_ids = item["labels"]
             res, res_with_o = eval(y_pred, label_ids)
 
             Ps.append(res[0])
@@ -97,7 +55,8 @@ def test_loop(config, dataloader, model, mode):
             P_with_O.append(res_with_o[0])
             R_with_O.append(res_with_o[1])
             F1_with_O.append(res_with_o[2])
-
+            
+            progress_bar.update(1)
         print(f'without class O: precision: {np.mean(Ps)} || recall: {np.mean(Rs)} || f1_score: {np.mean(F1s)}')
         print(f'with class O: precision: {np.mean(P_with_O)} || recall: {np.mean(R_with_O)} || f1_score: {np.mean(F1_with_O)}\n')
     return (Ps, Rs, F1s), (P_with_O, R_with_O, F1_with_O)
@@ -115,8 +74,15 @@ def eval(y_pred, label_ids):
     labels = label_ids.tolist()
     for row in range(len(labels)):
         # 去掉 [CLS] 和 [SEP] 特殊标记
-        labels[row] = labels[row][1:-1]
-        y_pred[row] = y_pred[row][1:-1]
+        labels[row] = labels[row]
+        y_pred[row] = y_pred[row]
+        
+        # 由于有mask的存在，某些y_pred长度会小于labels长度，我们需要补齐
+        while len(y_pred[row]) < len(labels[row]):
+            y_pred[row] += [0]
+            
+        if len(labels[row]) != len(y_pred[row]):
+            breakpoint()
 
         # 有实体类别 O 的情况
         P_with_O.append(
@@ -132,7 +98,7 @@ def eval(y_pred, label_ids):
         cur_true, cur_pred = [], []
         for i in range(len(y_pred[row])):
             # 如果标签不是 0 或者标签是 0 但预测结果不是 0 
-            if labels[row][i] != 0 or y_pred[row][i] != 0:
+            if labels[row][i] != 0 and y_pred[row][i] != 0:
                 cur_true.append(labels[row][i])
                 cur_pred.append(y_pred[row][i])
         # 如果这一行没有一个除 O 之外的实体类别，则直接跳过这一行
