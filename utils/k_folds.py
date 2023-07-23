@@ -1,4 +1,5 @@
 import time
+import json
 import os
 import logging
 from importlib import import_module
@@ -89,8 +90,10 @@ def print_trainable_params(model):
     total_params = sum([p.numel() for p in model.parameters()])
     trainable_params = sum([p.numel() for p in model.parameters() if p.requires_grad])
     trainable_ratio = trainable_params / total_params
-    logger.info(f'total parameters: {total_params} || trainable parameters: {trainable_params} || \
-                trainable ratio: {100*trainable_ratio:.2f}%')
+    logger.info(f'total parameters: {total_params} || \
+            trainable parameters: {trainable_params} || \
+            trainable ratio: {100*trainable_ratio:.2f}%'
+        )
     
 
 def k_folds(config, data):
@@ -117,8 +120,8 @@ def k_folds(config, data):
         train_data.reset_index(drop=True, inplace=True)
         val_data.reset_index(drop=True, inplace=True)
         
-        train_dataset = MyDataset(train_data)
-        val_dataset = MyDataset(val_data)
+        train_dataset = MyDataset(config, train_data)
+        val_dataset = MyDataset(config, val_data)
         train_dataloader = MyDataLoader(config, train_dataset).get_dataloader()
         val_dataloader = MyDataLoader(config, val_dataset).get_dataloader()
         

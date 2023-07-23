@@ -1,3 +1,4 @@
+import json
 import numpy as np
 import torch
 from tqdm import tqdm
@@ -69,17 +70,24 @@ def eval(y_pred, label_ids):
     我们考虑有实体类别 O 和没有实体类别 O 这两种情况的 p-r-f1值
     '''
     # 我们只考虑主要实体部分，如果标签是-100，我们就不考虑
+    view = {
+        "pred":[],
+        "label":[]
+            }
     R_with_O, P_with_O, F1_with_O = [], [], []
     R, P, F1 = [], [], []
     labels = label_ids.tolist()
     for row in range(len(labels)):
         # 去掉 [CLS] 和 [SEP] 特殊标记
-        labels[row] = labels[row]
-        y_pred[row] = y_pred[row]
+        labels[row] = labels[row][1:-1]
+        y_pred[row] = y_pred[row][1:-1]
         
-        # 由于有mask的存在，某些y_pred长度会小于labels长度，我们需要补齐
-        while len(y_pred[row]) < len(labels[row]):
-            y_pred[row] += [0]
+        # # 由于有mask的存在，某些y_pred长度会小于labels长度，我们需要补齐
+        # while len(y_pred[row]) < len(labels[row]):
+        #     y_pred[row] += [0]
+        labels[row] = labels[row][:len(y_pred[row])]
+        view["pred"].append(y_pred[row])
+        view["label"].append(labels[row])
             
         if len(labels[row]) != len(y_pred[row]):
             breakpoint()

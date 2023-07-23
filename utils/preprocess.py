@@ -73,12 +73,18 @@ class DataProcessor(object):
                 f"data augmentation level is {self.augmentation_level}, so there won't be any augmentations...")
             return
         elif self.augmentation_level == 1:
+            logger.info(
+                f"data augmentation level is {self.augmentation_level}, so sep will be randomly added...")
             self.add_sep()
             return
         elif self.augmentation_level == 2:
+            logger.info(
+                f"data augmentation level is {self.augmentation_level}, so chars will be randomly deleted...")
             self.del_char()
             return
         elif self.augmentation_level == 3:
+            logger.info(
+                f"data augmentation level is {self.augmentation_level}, so entities will be randomly replaced...")
             entity_dict = self.get_entity_dict()
             self.replace_entity(entity_dict)
             return

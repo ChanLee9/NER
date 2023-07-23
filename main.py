@@ -5,6 +5,7 @@ import argparse
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, required=True, help='select a model to run')
+    parser.add_argument('--label_path', type=str, default="data/label.txt", help="path to label set")
     parser.add_argument('--span', type=int, default=64, help='select a model to run')
     parser.add_argument('--augmentation_level', type=int, default=4, help='select a model to run')
     parser.add_argument('--merge_weight', action='store_true', help='whether to merge weights in bert layers')

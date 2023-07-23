@@ -7,10 +7,10 @@ from .preprocess import DataProcessor
 from dataclasses import dataclass
 
 class MyDataset(data.Dataset):
-    def __init__(self, raw_data, label_path=None) -> None:
+    def __init__(self, config, raw_data, label_path=None) -> None:
         super().__init__()
         if label_path is None:
-            self.LABEL_PATH = "data/label.txt"
+            self.LABEL_PATH = config.label_path
         self.label2id = self.get_label_id_map()
         self.dataset = self.get_dataset(raw_data)
     
