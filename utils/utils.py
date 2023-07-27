@@ -30,8 +30,8 @@ class MyDataset(data.Dataset):
             text, anno = item["text"], item["BIO_anno"]
             res = {
                 "entities": [],
-                "starts": [],
-                "ends": []
+                "starts": [-100,],
+                "ends": [-100,]
             }
             i = 0
             while i < len(anno):
@@ -166,16 +166,71 @@ class MyDataLoader():
         )
         return dataloader
 
+# test for make_pred_idx
+class Test():
+    def __init__(self) -> None:
+        self.label_path = "../data/label.txt"
+        self.label2id, self.id2label = self.get_label_id_map(self.label_path)
+    
+    def get_label_id_map(self, label_path):
+        """
+        获取label到id的映射字典和id到label的映射字典
+        """
+        labels = pd.read_csv(label_path)
+        label2id = {}
+        for idx, item in labels.iterrows():
+            label, id = item["label"], item["id"]
+            label2id[label] = int(id)
+        id2label = {}
+        for item in label2id:
+            id2label[label2id[item]] = item
+        return label2id, id2label
+    
+    def make_pred_idx(self, start_idx, end_idx):
+            """从starts_idx和endd_idx中得到pred_idx
+
+            Args:
+                satrt_idx (_type_): (batch_size, seq_len, 1)
+                end_idx (_type_): (batch_size, seq_len, 1)
+            """
+            pred_idx = torch.zeros(start_idx.size())
+            batch_size, seq_len = start_idx.shape
+            
+            for batch in range(batch_size):
+                i = 0
+                while i < seq_len:
+                    j = i
+                    if start_idx[batch, i] != 0:
+                        start = start_idx[batch, i]
+                        pred_idx[batch, i] = start
+                        
+                        while  j < seq_len and end_idx[batch, j] == 0:
+                            j += 1
+                        
+                        if j < seq_len:
+                            # 此时[i+1:j]的值应该取end_idx[batch, j+1,]
+                            pred_idx[batch, i+1:j+1] = end_idx[batch, j] 
+                        else:
+                            # 被截断了，导致后面没取到end_idx就结束了，此时我们应该把剩下部分填充为self.label2id[f"I-"{self.id2label[start][2:]}]
+                            entity = self.id2label[int(start)][2:]
+                            pred_idx[batch, i+1:] = torch.tensor(self.label2id[f"I-{entity}"], device=start_idx.device)
+                        
+                    i = j + 1
+            
+            return pred_idx
+
 if __name__ == "__main__":
     @dataclass
     class Config():
         span = 60
         data_path = "../data/train_data_public.csv"
         save_path = "../save_dir"
-        augmentation_level = 4
+        label_path = "../data/label.txt"
+        augmentation_level = 0
         batch_size = 32
         max_length = 64
-        model_name_or_path = "../pretrained_model/bert-base-chinese"
+        model_name_or_path = "../pretrained_models/bert-base-chinese"
+        device = "cpu"
 
     config = Config()
     data_processer = DataProcessor(config)
@@ -188,9 +243,13 @@ if __name__ == "__main__":
     print(
         f"class distribution after: {data_processer.raw_data['class'].value_counts()}")
     
-    my_dataset = MyDataset(data_processer.raw_data)
+    my_dataset = MyDataset(config, data_processer.raw_data)
     print(my_dataset.dataset)
     my_dataloader = MyDataLoader(config, my_dataset).get_dataloader()
     temp_data = next(iter(my_dataloader))
+    test = Test()
+    start_idx, end_idx = temp_data["starts"], temp_data["ends"]
+    labels = temp_data["labels"]
+    pred_idx = test.make_pred_idx(start_idx, end_idx)
     breakpoint()
     

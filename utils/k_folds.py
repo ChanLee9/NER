@@ -212,8 +212,8 @@ def k_folds(config, data):
 
     # -------------------------------------testing----------------------------------
     test_data = pd.read_csv(config.test_path)
-    test_dataset = Dataset(config, test_data)
-    test_dataloader = Dataloader(config, test_dataset)
+    # test_dataset = Dataset(config, test_data)
+    # test_dataloader = Dataloader(config, test_dataset)
     model.load_state_dict(torch.load(save_path+'_weights.bin'))
     model = model.to(config.device)
     P, R, F1 = test_loop(config, test_dataloader, model, mode='testing')    

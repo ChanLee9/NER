@@ -4,7 +4,6 @@ import torch.nn as nn
 from torch.nn import CrossEntropyLoss
 from transformers import BertModel
 
-
 class Model(nn.Module):
     def __init__(self, config) -> None:
         super().__init__()
@@ -36,7 +35,7 @@ class Model(nn.Module):
             id2label[label2id[item]] = item
         return label2id, id2label
     
-    def compute_satrt_end_idx(self, item):
+    def compute_logits(self, item):
         encodings = item["texts_encoding"]
         input_ids, mask = encodings["input_ids"], encodings["attention_mask"]
 
@@ -56,24 +55,26 @@ class Model(nn.Module):
         start_logits = self.start_fc(sequence_output)
         end_logits = self.end_fc(sequence_output)
         
-        start_idx = torch.argmax(start_logits, dim=2)
-        end_idx = torch.argmax(end_logits, dim=2)
-
-        return start_idx, end_idx 
+        return start_logits, end_logits 
         
     def forward(self, item):
-        start_idx, end_idx = self.compute_satrt_end_idx(item)
+        start_logits, end_logits = self.compute_logits(item)
+        
+        start_idx = torch.argmax(start_logits, dim=2)
+        end_idx = torch.argmax(end_logits, dim=2)
+        
         pred_idx = self.make_pred_idx(start_idx, end_idx)
-        return pred_idx 
+        return pred_idx.clone().detach().tolist()
     
     def loss_fn(self, item):
-        pred_idx = self.forward(item)
-        # start_idx, end_idx = self.compute_satrt_end_idx(item)
-        # pred_idx = self.make_pred_idx(start_idx, end_idx)
-
-        criterion = CrossEntropyLoss()
-        label_ids = item["labels"]
-        loss = criterion(pred_idx, label_ids)
+        start_logits, end_logits = self.compute_logits(item)
+        starts, ends = item["starts"], item["ends"]
+        criterion = CrossEntropyLoss(reduction="sum")
+        start_logits = start_logits.view(-1, self.config.label_size)
+        end_logits = end_logits.view(-1, self.config.label_size)
+        starts = starts.view(-1).long()
+        ends = ends.view(-1).long()
+        loss = criterion(start_logits, starts) + criterion(end_logits, ends)
         return loss    
 
     def make_pred_idx(self, start_idx, end_idx):
@@ -102,11 +103,10 @@ class Model(nn.Module):
                         pred_idx[batch, i+1:j+1] = end_idx[batch, j] 
                     else:
                         # 被截断了，导致后面没取到end_idx就结束了，此时我们应该把剩下部分填充为self.label2id[f"I-"{self.id2label[start][2:]}]
-                        entity = self.id2label[start][2:]
-                        pred_idx[batch, i+1:] = self.label2id[f"I-{entity}"]
+                        entity = self.id2label[int(start)][2:]
+                        pred_idx[batch, i+1:] = torch.tensor(self.label2id[f"I-{entity}"], device=start_idx.device)
                     
                 i = j + 1
-        breakpoint()
-        return pred_idx
         
+        return pred_idx 
         
