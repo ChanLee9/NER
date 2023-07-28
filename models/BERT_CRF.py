@@ -146,7 +146,7 @@ class Model(nn.Module):
         
         self.bert = BertModel.from_pretrained(self.config.model_name_or_path)
         self.dropout = nn.Dropout(self.config.dropout)
-        if self.merge_weight is not None:
+        if self.merge_weight:
             self.merge_fc = nn.Linear(
                 self.bert.config.num_hidden_layers * self.bert.config.hidden_size, 
                 self.bert.config.hidden_size
@@ -167,7 +167,7 @@ class Model(nn.Module):
         
         # bert_output: (last_hidden_state, pooler_output, hidden_states)
         sequence_output = bert_output.last_hidden_state
-        if self.merge_weight is not None:
+        if self.merge_weight:
             sequence_output = torch.cat(bert_output.hidden_states[1:], dim=-1)
             sequence_output = self.merge_fc(sequence_output)
             

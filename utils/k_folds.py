@@ -171,7 +171,7 @@ def k_folds(config, data):
         for epoch in range(config.epochs):
             total_loss = train_loop(train_dataloader, model, optimizer, lr_scheduler, epoch, config)
             loss.append(total_loss)
-            res, res_with_o = test_loop(config, val_dataloader, model, mode='validating')
+            res = test_loop(config, val_dataloader, model, mode='validating')
             
             if np.mean(res[2]) > best_f1:
                 best_f1 = np.mean(res[2])

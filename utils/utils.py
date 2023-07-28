@@ -151,6 +151,7 @@ class MyDataLoader():
                 breakpoint()
         item = {
             "texts_encoding": texts_encoding.to(self.device),
+            "entities": entities,
             "labels": torch.Tensor(labels).to(self.device),
             "starts": torch.Tensor(starts).to(self.device),
             "ends": torch.Tensor(ends).to(self.device)
