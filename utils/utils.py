@@ -149,10 +149,28 @@ class MyDataLoader():
                 ends[row] = ends[row][:seq_len]
             if len(starts[row]) != seq_len or len(ends[row]) != seq_len:
                 breakpoint()
+        
+        # 为global pointer制作标签：
+        entity_dict = {}
+        for label in self.label2id.keys():
+            if label[2:] and label[2:] not in entity_dict:
+                entity_dict[label[2:]] = len(entity_dict)
+                
+        label_for_gp = torch.zeros((len(batch), len(entity_dict), seq_len, seq_len))
+        for row in range(len(entities)):
+            for item in entities[row]:
+                entity_type, start_idx, end_idx = item[1], item[2], item[3]
+                if end_idx > seq_len:
+                    continue
+                
+                # 注意我们在之前的处理中，start_idx和end_idx都是包含的，因此这里要减一
+                label_for_gp[row][entity_dict[entity_type]][start_idx][end_idx-1] = 1
+        
         item = {
             "texts_encoding": texts_encoding.to(self.device),
             "entities": entities,
             "labels": torch.Tensor(labels).to(self.device),
+            "label_for_gp": torch.Tensor(label_for_gp).to(self.device),
             "starts": torch.Tensor(starts).to(self.device),
             "ends": torch.Tensor(ends).to(self.device)
         }

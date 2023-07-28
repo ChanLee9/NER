@@ -131,7 +131,7 @@ def k_folds(config, data):
         
         if config.use_lora:
             logger.info('using lora...\n')
-            if "BERT" in config.model:
+            if "GPT" not in config.model:
                 model_dim = model.bert.embeddings.word_embeddings.embedding_dim
 
                 # 默认把lora模块应用到 kqvo 中

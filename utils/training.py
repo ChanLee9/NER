@@ -45,7 +45,10 @@ def test_loop(config, dataloader, model, mode):
         for batch, item in enumerate(dataloader):
             # y_pred的例子 ：[[1, 2, 3], [2, 3], [1]], 之所以长度不同是因为有mask的存在。长度递减是因为dataloader中按照长度给输入排序了。
             y_pred = model(item)
-            res = eval(y_pred, item, config)
+            if config.model == "GLOBALPOINTERS":
+                res = eval_globalpointers(y_pred, item)
+            else:
+                res = eval(y_pred, item, config)
 
             Ps.append(res[0])
             Rs.append(res[1])
@@ -54,6 +57,34 @@ def test_loop(config, dataloader, model, mode):
             progress_bar.update(1)
         print(f'precision: {np.mean(Ps)} || recall: {np.mean(Rs)} || f1_score: {np.mean(F1s)}')
     return Ps, Rs, F1s
+
+def eval_globalpointers(y_pred, item):
+    """评估globalpointers模型
+
+    Args:
+        y_pred (_type_): y_pred: shape of (batchsize, entity_type_num, seq_len, seq_len)
+        item (_type_): 只取y_true = item["label_for_gp"]
+
+    Returns:
+        _type_: _description_
+    """
+    y_true = item["label_for_gp"]
+    y_pred = y_pred.data.cpu().numpy()
+    y_true = y_true.data.cpu().numpy()
+    pred = []
+    true = []
+    for b, l, start, end in zip(*np.where(y_pred > 0)):
+        pred.append((b, l, start, end))
+    for b, l, start, end in zip(*np.where(y_true > 0)):
+        true.append((b, l, start, end))
+
+    P = set(pred)
+    T = set(true)
+    X = len(P & T)
+    Y = len(P)
+    Z = len(T)
+    f1, precision, recall = 2 * X / (Y + Z), X / Y, X / Z
+    return precision, recall, f1
 
 def get_label_id_map(label_path):
         """
