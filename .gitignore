@@ -1,4 +1,4 @@
-pretrained_model
+pretrained_models
 .ipynb*
 models/__pycache__/*
 utils/__pycache__/*
