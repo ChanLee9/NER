@@ -156,8 +156,6 @@ def k_folds(config, data):
                     layer.mlp.c_proj = lora.Conv1d(model_dim, model_dim, kerner_size=1, r=config.lora_r)
                 
                 lora.mark_only_lora_as_trainable(model)
-            else:
-                raise NotImplementedError
             
         # 查看模型可训练参数量
         print_trainable_params(model)
