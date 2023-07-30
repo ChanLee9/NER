@@ -164,13 +164,16 @@ class MyDataLoader():
             labels[idx][len(encoding.tokens())-1:] = -100
             
             # 将 labels 其余部分转化成 id
-            for item in entities[idx]:
-                entity, char_start, char_end = item[1], item[2], item[3]
-                
-                # 通过char_start和char_end找到对应的token_start和token_end
-                token_start, token_end = encoding.char_to_token(char_start), encoding.char_to_token(char_end-1)
-                labels[idx][token_start] = self.label2id[f"B-{entity}"]
-                labels[idx][token_start+1:token_end+1] = self.label2id[f"I-{entity}"]
+            try:
+                for item in entities[idx]:
+                    entity, char_start, char_end = item[1], item[2], item[3]
+                    
+                    # 通过char_start和char_end找到对应的token_start和token_end
+                    token_start, token_end = encoding.char_to_token(char_start), encoding.char_to_token(char_end-1)
+                    labels[idx][token_start] = self.label2id[f"B-{entity}"]
+                    labels[idx][token_start+1:token_end+1] = self.label2id[f"I-{entity}"]
+            except:
+                breakpoint()
         
         # 把starts和ends用-100填充到同一长度，
         seq_len = texts_encoding['input_ids'].shape[1]

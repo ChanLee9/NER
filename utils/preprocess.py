@@ -321,10 +321,10 @@ class DataProcessor(object):
 if __name__ == "__main__":
     @dataclass
     class Config():
-        span = 64
+        span = 60
         data_path = "../data/train_data_public.csv"
         save_path = "../save_dir"
-        augmentation_level = 4
+        augmentation_level = 0
         k_folds = 5
 
     config = Config()
@@ -344,8 +344,8 @@ if __name__ == "__main__":
     for idx, item in data_processer.raw_data.iterrows():
         if len(item["text"]) != len(item["BIO_anno"]):
             print(f"{idx}, not equal length")
-        if len(item["text"]) >= 64:
-            print(f"{idx}, length over 64")
+        if len(item["text"]) >= 62:
+            print(f"{item['text']}, length is {len(item['text'])}")
             
     def generate_data_for_kfolds(data, test_size=0.2):
         """_summary_

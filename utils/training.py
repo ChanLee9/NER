@@ -55,7 +55,7 @@ def test_loop(config, dataloader, model, mode):
             F1s.append(res[2])
             
             progress_bar.update(1)
-        print(f'precision: {np.mean(Ps)} || recall: {np.mean(Rs)} || f1_score: {np.mean(F1s)}')
+        print(f'{mode}: precision: {np.mean(Ps)} || recall: {np.mean(Rs)} || f1_score: {np.mean(F1s)}')
     return Ps, Rs, F1s
 
 def eval_globalpointers(y_pred, item):
