@@ -1,0 +1,21 @@
+{
+    "model": "BERT_SPAN",
+    "model_name_or_path": "pretrained_models/bert-base-chinese",
+    "dropout": 0.2,
+    "merge_weight": false,
+    "device": "cuda:0",
+    "max_length": 64,
+    "batch_size": 16,
+    "epochs": 5,
+    "lr": 2e-05,
+    "data_path": "data/train_data_public.csv",
+    "save_path": "saved_results",
+    "label_path": "data/label.txt",
+    "test_size": 0.2,
+    "span": 60,
+    "augmentation_level": 4,
+    "use_lora": false,
+    "label_size": 9,
+    "lora_r": null,
+    "k_folds": 5
+}
