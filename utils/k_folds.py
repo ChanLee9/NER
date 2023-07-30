@@ -77,6 +77,55 @@ def print_trainable_params(model):
             trainable parameters: {trainable_params} || \
             trainable ratio: {100*trainable_ratio:.2f}%'
         )
+
+def save_results(save_path, res, config):
+    """根据当前轮次结果决定是否保存结果，如果当前更好则除了保存训练结果之外还要保存用于训练的超参数
+
+    Args:
+        save_path (_type_): _description_
+        res (_type_): dict of results like {
+            "average_precision": Float,
+            "average_recall": Float,
+            "average_f1_score": Float,
+            "precision": List[float],
+            "recall": List[float],
+            "f1_score": List[float]
+            }
+        config (_type_): hyperparameters in main.py
+    """
+    res_save_path = os.path.join(save_path, 'results.json')
+    pic_save_path = os.path.join(save_path, 'results.png')
+    if os.path.exists(res_save_path):
+        with open(res_save_path, 'r') as f:
+            results = json.load(f)
+            if "average_f1_score" in results:
+                f1 = results['average_f1_score']
+            else:
+                f1 = 0.
+                
+        # 小于历史最好结果，不保存
+        if f1 > res["average_f1_score"]:
+            logger.info(f"current f1 score: {res['average_f1_score']:.4f} < history f1 score: {f1:.4f}, no need to save!")
+        else:
+            logger.info(f"current f1 score: {res['average_f1_score']:.4f} > history f1 score: {f1:.4f}, saving results...")
+            with open(res_save_path, 'w') as f:
+                json.dump(res, f, ensure_ascii=False, indent=4)
+            # 保存超参数
+            with open(os.path.join(save_path, 'config.json'), 'w') as f:
+                json.dump(config.__dict__, f, ensure_ascii=False, indent=4)
+            # 保存结果图
+            logger.info(f"plot saved in {pic_save_path}...")              
+            plot_results(res["precision"], res["recall"], res["f1_score"], pic_save_path) 
+    else:
+        logger.info(f"current f1 score: {res['average_f1_score']:.4f}, saving results...")
+        with open(res_save_path, 'w') as f:
+            json.dump(res, f, ensure_ascii=False, indent=4)
+        # 保存超参数
+        with open(os.path.join(save_path, 'config.json'), 'w') as f:
+            json.dump(config.__dict__, f, ensure_ascii=False, indent=4)
+        # 保存结果图
+        logger.info(f"plot saved in {pic_save_path}...")              
+        plot_results(res["precision"], res["recall"], res["f1_score"], pic_save_path) 
     
 
 def k_folds(config, data):
@@ -196,17 +245,7 @@ def k_folds(config, data):
         "f1_score": res[2]
     }
     
-    res_save_path = os.path.join(save_path, 'results.json')
-    logger.info("results saved in {res_save_path}...")
-    json.dump(results, 
-              open(res_save_path, 'w'),
-              ensure_ascii=False,
-              indent=4
-            )
-    
-    pic_save_path = os.path.join(save_path, 'results.png')
-    logger.info(f"plot saved in {pic_save_path}...")              
-    plot_results(res[0], res[1], res[2], pic_save_path)  
+    save_results(save_path, results, config)
     
     logger.info('Done')
     end_time = time.time()
