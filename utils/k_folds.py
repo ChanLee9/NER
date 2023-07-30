@@ -23,6 +23,16 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def plot_results(Ps, Rs, F1s, save_path):
+    assert len(Ps) == len(Rs) == len(F1s), "length of Ps, Rs, F1s should be equal!"
+    plt.figure(figsize=(10, 5))
+    xx = np.arange(1, len(Ps)+1)
+    plt.plot(xx, Ps, label='precision')
+    plt.plot(xx, Rs, label='recall')
+    plt.plot(xx, F1s, label='f1_score')
+    plt.plot(xx, np.mean(F1s)*np.ones(len(F1s)), label='average f1_score', linestyle='--')
+    plt.legend()
+    plt.savefig(save_path)
 
 def generate_data_for_kfolds(data, config):
     """_summary_
@@ -38,33 +48,6 @@ def generate_data_for_kfolds(data, config):
     induces = kfold.split(train)
     
     return induces, test
-
-
-def get_train_val(i, config):       # 第i轮
-    data = pd.read_csv(config.train_path)
-    total_len = len(data)
-    val_len = total_len//config.k_folds
-    train_data = pd.concat([data[:i*val_len], data[(i+1)*val_len:]], join='inner')
-    val_data = data[i*val_len:(i+1)*val_len]
-    return train_data.reset_index(), val_data.reset_index()
-
-def visualize_loss(losses, img_save_path, K):
-    figure, axs = plt.subplots(1, K, sharey=True)
-    figure.suptitle(f'Loss in {K} folds')
-    for i in range(K):
-        xx = range(len(losses[i]))
-        axs[i].plot(xx, losses[i])
-        axs[i].set_xlabel('round '+str(i+1))
-    plt.savefig(img_save_path + 'Losses.jpg')
-
-def visualize_p_r_f1(data, mode, img_save_path, K):
-    figure, axs = plt.subplots(1, K, sharey=True)
-    figure.suptitle(f'{mode} in {K} folds')
-    for i in range(K):
-        axs[i].boxplot(data[i])
-        axs[i].set_xlabel('round '+str(i+1))
-    plt.savefig(img_save_path+mode+'.jpg')
-
 
 def unfreeze_params(model):
     """在冻结了除lora层以外层的参数后，把lstm和crf中的参数设置为可学习
@@ -107,10 +90,12 @@ def k_folds(config, data):
     
     induces, test_data = generate_data_for_kfolds(data, config)
     test_data.reset_index(drop=True, inplace=True)
+    test_dataset = MyDataset(config, test_data)
+    test_dataloader = MyDataLoader(config, test_dataset).get_dataloader()
     
     start_time = time.time()
-    best_f1 = 0.4
-    losses, Ps, Rs, F1s = [], [], [], []
+    best_f1 = 0.
+    # losses, Ps, Rs, F1s = [], [], [], []
     averaged = [[], [], []]     # p, r, f1
     for idx, item in enumerate(induces):
         logger.info(f'------------the {idx+1}th round begin, {config.k_folds} rounds in total--------------------')
@@ -173,50 +158,58 @@ def k_folds(config, data):
             
             if np.mean(res[2]) > best_f1:
                 best_f1 = np.mean(res[2])
-                print('saving weights...\n')
-                torch.save(model.state_dict(), os.path.join(save_path, config.model + '_weights.bin'))
+                logger.info('saving weights...')
+                torch.save(model.state_dict(), os.path.join(save_path, 'weights.bin'))
                 
-        losses.append(loss)
+        # losses.append(loss)
         
         # ---------------------------validation-----------------------------
-        res, res_with_o = test_loop(config, val_dataloader, model, mode='validating')
+        res = test_loop(config, val_dataloader, model, mode='validating')
         averaged_p = np.mean(res[0])
         averaged_r = np.mean(res[1])
         averaged_f1 = np.mean(res[2])
         
         if averaged_f1 > best_f1:
             best_f1 = averaged_f1
-            print('saving weights...\n')
-            
-            torch.save(model.state_dict(), save_path+'_weights.bin')
-        print(f'validation averaged: precision: {averaged_p},  recall: {averaged_r},  F1 score: {averaged_f1}')
-        
-        Ps.append(res[0])
-        Rs.append(res[1])
-        F1s.append(res[2])
+            logger.info('saving weights...')
+            torch.save(model.state_dict(), os.path.join(save_path, 'weights.bin'))
         
         averaged[0].append(averaged_p)
         averaged[1].append(averaged_r)
         averaged[2].append(averaged_f1)
         
+    logger.info(f"overall precision: {np.mean(averaged[0])} || overall recall: {np.mean(averaged[1])} || overall f1 score: {np.mean(averaged[2])}")
     
-    # -------------------------------visualising-------------------------------
-    visualize_loss(losses, save_path, config.k_folds)
-    visualize_p_r_f1(F1s, 'F1 score', save_path, config.k_folds)
-    visualize_p_r_f1(Ps, 'Precision', save_path, config.k_folds)
-    visualize_p_r_f1(Rs, 'Recall', save_path, config.k_folds)
-    print(f'validation final averaged: precision: {np.mean(averaged[0])}, recall: {np.mean(averaged[1])}, f1 score: {np.mean(averaged[2])}')
-    
-
     # -------------------------------------testing----------------------------------
-    test_data = pd.read_csv(config.test_path)
-    # test_dataset = Dataset(config, test_data)
-    # test_dataloader = Dataloader(config, test_dataset)
-    model.load_state_dict(torch.load(save_path+'_weights.bin'))
+    logger.info(f"loading best model...")
+    model.load_state_dict(torch.load(os.path.join(save_path, 'weights.bin')))
     model = model.to(config.device)
-    P, R, F1 = test_loop(config, test_dataloader, model, mode='testing')    
-    print(f'test averaged: precision: {np.mean(P)},  recall: {np.mean(R)},  F1 score: {np.mean(F1)}')    
-        
-    print('Done')
+    
+    res = test_loop(config, test_dataloader, model, mode='testing')
+
+    results = {
+        "average_precision": np.mean(res[0]),
+        "average_recall": np.mean(res[1]),
+        "average_f1_score": np.mean(res[2]),
+        "precision": res[0],
+        "recall": res[1],
+        "f1_score": res[2]
+    }
+    
+    res_save_path = os.path.join(save_path, 'results.json')
+    logger.info("results saved in {res_save_path}...")
+    json.dump(results, 
+              open(res_save_path, 'w'),
+              ensure_ascii=False,
+              indent=4
+            )
+    
+    pic_save_path = os.path.join(save_path, 'results.png')
+    logger.info(f"plot saved in {pic_save_path}...")              
+    plot_results(res[0], res[1], res[2], pic_save_path)  
+    
+    logger.info('Done')
     end_time = time.time()
-    print(f'total time : {end_time - start_time}')
+    time_consumed = end_time - start_time
+    logger.info(f'total time : {time_consumed // 60}m {time_consumed % 60}s')
+    

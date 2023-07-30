@@ -1,75 +1,24 @@
-from utils.preprocess import DataProcessor
-from dataclasses import dataclass
-import torch
-import pandas as pd
-class Test():
-    def __init__(self) -> None:
-        self.label_path = "data/label.txt"
-        self.label2id, self.id2label = self.get_label_id_map(self.label_path)
-    
-    def get_label_id_map(self, label_path):
-        """
-        获取label到id的映射字典和id到label的映射字典
-        """
-        labels = pd.read_csv(label_path)
-        label2id = {}
-        for idx, item in labels.iterrows():
-            label, id = item["label"], item["id"]
-            label2id[label] = int(id)
-        id2label = {}
-        for item in label2id:
-            id2label[label2id[item]] = item
-        return label2id, id2label
-    
-    def make_pred_idx(self, start_idx, end_idx):
-            """从starts_idx和endd_idx中得到pred_idx
+import matplotlib.pyplot as plt
+import json
+import numpy as np
 
-            Args:
-                satrt_idx (_type_): (batch_size, seq_len, 1)
-                end_idx (_type_): (batch_size, seq_len, 1)
-            """
-            pred_idx = torch.zeros(start_idx.size())
-            batch_size, seq_len = start_idx.shape
-            
-            for batch in range(batch_size):
-                i = 0
-                while i < seq_len:
-                    j = i
-                    if start_idx[batch, i] != 0:
-                        start = start_idx[batch, i]
-                        pred_idx[batch, i] = start
-                        
-                        while  j < seq_len and end_idx[batch, j] == 0:
-                            j += 1
-                        
-                        if j < seq_len:
-                            # 此时[i+1:j]的值应该取end_idx[batch, j+1,]
-                            pred_idx[batch, i+1:j+1] = end_idx[batch, j] 
-                        else:
-                            # 被截断了，导致后面没取到end_idx就结束了，此时我们应该把剩下部分填充为self.label2id[f"I-"{self.id2label[start][2:]}]
-                            entity = self.id2label[int(start)][2:]
-                            pred_idx[batch, i+1:] = torch.tensor(self.label2id[f"I-{entity}"], device=start_idx.device)
-                        
-                    i = j + 1
-            
-            return pred_idx
+data_path = "saved_results/BERT_SPAN/BERT_SPAN_results.json"
+data = json.load(open(data_path, "r"))
 
-# test for make_pred_idx            
-if __name__ == "__main__":
-    import os
-    print(os.getcwd())
-    @dataclass
-    class Config():
-        span = 64
-        data_path = "data/train_data_public.csv"
-        save_path = "save_dir"
-        augmentation_level = 0
-        k_folds = 5
+Ps = data["precision"]
+Rs = data["recall"]
+F1s = data["f1_score"]
 
-    config = Config()
-    data_processer = DataProcessor(config)
-    raw_data = data_processer.raw_data
-    data_processer.data_augmentation()
+def plot_results(Ps, Rs, F1s, save_path):
+    assert len(Ps) == len(Rs) == len(F1s), "length of Ps, Rs, F1s should be equal!"
+    plt.figure(figsize=(10, 5))
+    xx = np.arange(1, len(Ps)+1)
+    plt.plot(xx, Ps, label='precision')
+    plt.plot(xx, Rs, label='recall')
+    plt.plot(xx, F1s, label='f1_score')
+    plt.plot(xx, np.mean(F1s)*np.ones(len(F1s)), label='average f1_score', linestyle='--')
+    plt.legend()
+    plt.savefig(save_path)
     
-    test = Test()
-    breakpoint()
+save_path = "test.png"
+plot_results(Ps, Rs, F1s, save_path)
