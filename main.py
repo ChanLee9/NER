@@ -14,7 +14,7 @@ def get_args():
     parser.add_argument('--use_lora', action='store_true', help='whether to use lora module')
     parser.add_argument('--use_amp', action='store_true', help='whether to use amp to acclerate training')
     parser.add_argument('--grad_accumulation', type=int, default=1, help='whether to use gradient accumulate')
-    parser.add_argument('--model_name_or_path', type=str, default='pretrained_models/bert-base-chinese', help='path to pretrained models')
+    parser.add_argument('--model_name_or_path', type=str, default='pretrained_models/gpt2', help='path to pretrained models')
     parser.add_argument('--label_size', type=int, default=9, help='number of labels')
     parser.add_argument('--max_length', type=int, default=64, help='max length to tokenize sentences')
     parser.add_argument('--dropout', type=float, default=0.2, help='dropout rate')

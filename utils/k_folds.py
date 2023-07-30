@@ -131,7 +131,7 @@ def k_folds(config, data):
         
         if config.use_lora:
             logger.info('using lora...\n')
-            if "BERT" in config.model:
+            if "GPT" not in config.model:
                 model_dim = model.bert.embeddings.word_embeddings.embedding_dim
 
                 # 默认把lora模块应用到 kqvo 中
@@ -156,8 +156,6 @@ def k_folds(config, data):
                     layer.mlp.c_proj = lora.Conv1d(model_dim, model_dim, kerner_size=1, r=config.lora_r)
                 
                 lora.mark_only_lora_as_trainable(model)
-            else:
-                raise NotImplementedError
             
         # 查看模型可训练参数量
         print_trainable_params(model)
@@ -171,7 +169,7 @@ def k_folds(config, data):
         for epoch in range(config.epochs):
             total_loss = train_loop(train_dataloader, model, optimizer, lr_scheduler, epoch, config)
             loss.append(total_loss)
-            res, res_with_o = test_loop(config, val_dataloader, model, mode='validating')
+            res = test_loop(config, val_dataloader, model, mode='validating')
             
             if np.mean(res[2]) > best_f1:
                 best_f1 = np.mean(res[2])

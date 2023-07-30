@@ -93,26 +93,61 @@ class MyDataLoader():
         self.max_length = config.max_length
         self.label2id = dataset.label2id
         self.tokenizer = AutoTokenizer.from_pretrained(config.model_name_or_path)
+        
+        if "GPT" in config.model:
+            # 由于要加Prompt，所以最大长度要增加
+            self.prompt = self.make_prompt(text="", label="")
+            self.max_length = 2 * config.max_length
+    
+    def make_prompt(self, text, label):
+        """根据text和label生成prompt
+
+        Args:
+            text (_type_): _description_
+        """
+        return f"你是一名中文语言学家，现在你需要对一个句子标注实体类别，###现在你需要标注的句子是：{text}。###它的答案是：{label}。"
     
     def collate_fn(self, batch):
         # 把batch中的数据按照长度排序，以便添加padding, batch: (text, anno, label)
         batch.sort(key=lambda x: len(x[0]), reverse=True)    
         texts, annos, entities, starts, ends = [], [], [], [], []
+        
         for item in batch:
             text, anno, label = item
+            
+            # 如果有prompt，就加上prompt
+            if hasattr(self, "prompt"):
+                text = self.make_prompt(text, anno)
+                
             texts.append(text)
             annos.append(anno)
             entities.append(label["entities"])
             starts.append(label["starts"])
             ends.append(label["ends"])
         
-        texts_encoding = self.tokenizer(texts, 
-                                      return_tensors='pt', 
-                                      padding=True, 
-                                      truncation=True, 
-                                      max_length=self.max_length
-                                      )
+        # 在使用gpt2时，不加特殊字符
+        if hasattr(self, "prompt"):
+            texts_encoding = self.tokenizer(texts, 
+                                        return_tensors='pt', 
+                                        padding=True, 
+                                        truncation=True, 
+                                        max_length=self.max_length,
+                                        add_special_tokens=False
+                                        )
+        else:
+            texts_encoding = self.tokenizer(texts, 
+                                        return_tensors='pt', 
+                                        padding=True, 
+                                        truncation=True, 
+                                        max_length=self.max_length
+                                        )
 
+        if hasattr(self, "prompt"):
+            return {
+                "texts_encoding": texts_encoding.to(self.device),
+                "entities": entities
+            }
+        
         # 生成labels
         labels = torch.fill(texts_encoding['input_ids'], self.label2id["O"])    
             
@@ -149,9 +184,28 @@ class MyDataLoader():
                 ends[row] = ends[row][:seq_len]
             if len(starts[row]) != seq_len or len(ends[row]) != seq_len:
                 breakpoint()
+        
+        # 为global pointer制作标签：
+        entity_dict = {}
+        for label in self.label2id.keys():
+            if label[2:] and label[2:] not in entity_dict:
+                entity_dict[label[2:]] = len(entity_dict)
+                
+        label_for_gp = torch.zeros((len(batch), len(entity_dict), seq_len, seq_len))
+        for row in range(len(entities)):
+            for item in entities[row]:
+                entity_type, start_idx, end_idx = item[1], item[2], item[3]
+                if end_idx > seq_len:
+                    continue
+                
+                # 注意我们在之前的处理中，start_idx和end_idx都是包含的，因此这里要减一
+                label_for_gp[row][entity_dict[entity_type]][start_idx][end_idx-1] = 1
+        
         item = {
             "texts_encoding": texts_encoding.to(self.device),
+            "entities": entities,
             "labels": torch.Tensor(labels).to(self.device),
+            "label_for_gp": torch.Tensor(label_for_gp).to(self.device),
             "starts": torch.Tensor(starts).to(self.device),
             "ends": torch.Tensor(ends).to(self.device)
         }
