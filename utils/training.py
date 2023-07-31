@@ -109,17 +109,10 @@ def extract_entity(y_pred, config):
         y_pred (_type_): list of shape (batch_size, seq_len)
     """
     # 去掉 [CLS] 和 [SEP] 特殊标记
-    if "GPT" not in config.model:
-        for row in range(len(y_pred)):
-            y_pred[row] = y_pred[row][1:-1]
+    for row in range(len(y_pred)):
+        y_pred[row] = y_pred[row][1:-1]
     pred_entities = []
     label2id, id2label = get_label_id_map(config.label_path)
-    
-    if "GPT" in config.model:
-        # 此时生成的是BIO标注，我们需要先把它转化成对应的编号
-        for row in range(len(y_pred)):
-            for i in range(len(y_pred[row])):
-                y_pred[row][i] = label2id.get(y_pred[row][i], 0)
                 
     for row in range(len(y_pred)):
         pred_entities.append([])

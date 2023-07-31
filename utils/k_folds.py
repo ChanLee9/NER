@@ -165,32 +165,20 @@ def k_folds(config, data):
         
         if config.use_lora:
             logger.info('using lora...\n')
-            if "GPT" not in config.model:
-                model_dim = model.bert.embeddings.word_embeddings.embedding_dim
+            model_dim = model.bert.embeddings.word_embeddings.embedding_dim
 
-                # 默认把lora模块应用到 kqvo 中
-                for layer in model.bert.encoder.layer:
-                    layer.attention.self.query = lora.Linear(model_dim, model_dim, r=config.lora_r)
-                    layer.attention.self.key = lora.Linear(model_dim, model_dim, r=config.lora_r)
-                    layer.attention.self.value = lora.Linear(model_dim, model_dim, r=config.lora_r)
-                    layer.attention.output.dense = lora.Linear(model_dim, model_dim, r=config.lora_r)
-                    
-                lora.mark_only_lora_as_trainable(model)
+            # 默认把lora模块应用到 kqvo 中
+            for layer in model.bert.encoder.layer:
+                layer.attention.self.query = lora.Linear(model_dim, model_dim, r=config.lora_r)
+                layer.attention.self.key = lora.Linear(model_dim, model_dim, r=config.lora_r)
+                layer.attention.self.value = lora.Linear(model_dim, model_dim, r=config.lora_r)
+                layer.attention.output.dense = lora.Linear(model_dim, model_dim, r=config.lora_r)
                 
-                # 把 lstm和crf中的参数设置为可学习
-                unfreeze_params(model)
-            elif "GPT" in config.model:
-                model_dim = model.gpt.wte.embedding_dim
-                
-                # 默认把lora模块应用到 attn.c_attn、attn.c_proj、mlp.c_fc和mlp.c_proj 中
-                for layer in model.gpt.transformer.h:
-                    layer.attn.c_attn = lora.Conv1d(model_dim, model_dim, kerner_size=1, r=config.lora_r)
-                    layer.attn.c_proj = lora.Conv1d(model_dim, model_dim, kerner_size=1, r=config.lora_r)
-                    layer.mlp.c_fc = lora.Conv1d(model_dim, model_dim, kerner_size=1, r=config.lora_r)
-                    layer.mlp.c_proj = lora.Conv1d(model_dim, model_dim, kerner_size=1, r=config.lora_r)
-                
-                lora.mark_only_lora_as_trainable(model)
+            lora.mark_only_lora_as_trainable(model)
             
+            # 把 lstm和crf中的参数设置为可学习
+            unfreeze_params(model)
+                
         # 查看模型可训练参数量
         print_trainable_params(model)
                 

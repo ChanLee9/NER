@@ -93,19 +93,6 @@ class MyDataLoader():
         self.max_length = config.max_length
         self.label2id = dataset.label2id
         self.tokenizer = AutoTokenizer.from_pretrained(config.model_name_or_path)
-        
-        if "GPT" in config.model:
-            # 由于要加Prompt，所以最大长度要增加
-            self.prompt = self.make_prompt(text="", label="")
-            self.max_length = 2 * config.max_length
-    
-    def make_prompt(self, text, label):
-        """根据text和label生成prompt
-
-        Args:
-            text (_type_): _description_
-        """
-        return f"你是一名中文语言学家，现在你需要对一个句子标注实体类别，###现在你需要标注的句子是：{text}。###它的答案是：{label}。"
     
     def collate_fn(self, batch):
         # 把batch中的数据按照长度排序，以便添加padding, batch: (text, anno, label)
@@ -114,10 +101,6 @@ class MyDataLoader():
         
         for item in batch:
             text, anno, label = item
-            
-            # 如果有prompt，就加上prompt
-            if hasattr(self, "prompt"):
-                text = self.make_prompt(text, anno)
                 
             texts.append(text)
             annos.append(anno)
@@ -125,28 +108,12 @@ class MyDataLoader():
             starts.append(label["starts"])
             ends.append(label["ends"])
         
-        # 在使用gpt2时，不加特殊字符
-        if hasattr(self, "prompt"):
-            texts_encoding = self.tokenizer(texts, 
-                                        return_tensors='pt', 
-                                        padding=True, 
-                                        truncation=True, 
-                                        max_length=self.max_length,
-                                        add_special_tokens=False
-                                        )
-        else:
-            texts_encoding = self.tokenizer(texts, 
-                                        return_tensors='pt', 
-                                        padding=True, 
-                                        truncation=True, 
-                                        max_length=self.max_length
-                                        )
-
-        if hasattr(self, "prompt"):
-            return {
-                "texts_encoding": texts_encoding.to(self.device),
-                "entities": entities
-            }
+        texts_encoding = self.tokenizer(texts, 
+                                    return_tensors='pt', 
+                                    padding=True, 
+                                    truncation=True, 
+                                    max_length=self.max_length
+                                    )
         
         # 生成labels
         labels = torch.fill(texts_encoding['input_ids'], self.label2id["O"])    
