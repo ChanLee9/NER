@@ -6,5 +6,3 @@ saved_results/*/*.bin
 pretrained_*/
 bad_case_*/
 pre_process.ipynb
-test.*
-view.json
