@@ -42,7 +42,7 @@
 3. 在切分数据时，不同长度的影响(validation F1)
 
 由于span不同的时候，使用tokenizer切分的长度不同，因此需要对max_length进行处理，使得切分的长度为32的倍数，即
-$$max\_length = ceiling(span/32)*32$$
+$$max\_ length = ceiling(span/32)*32$$
 
   | ~ | SPAN=125 | SPAN=60 | SPAN=30 |
   | - | - | - | - |
