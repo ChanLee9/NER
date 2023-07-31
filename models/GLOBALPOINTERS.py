@@ -78,7 +78,7 @@ class Model(nn.Module):
         y_pred_neg = y_pred - y_true * 1e12
         
         # mask the pred outputs of neg classes
-        y_pred_pos = y_pred - (1 - y_true) * 1e12 
+        y_pred_pos = (y_pred - (1 - y_true) * 1e12) 
         zeros = torch.zeros_like(y_pred[..., :1])
         y_pred_neg = torch.cat([y_pred_neg, zeros], dim=-1)
         y_pred_pos = torch.cat([y_pred_pos, zeros], dim=-1)

@@ -85,6 +85,7 @@ def eval_globalpointers(y_pred, item):
     Z = len(T)
     if Y * Z == 0:
         return 0, 0, 0
+        
     f1, precision, recall = 2 * X / (Y + Z), X / Y, X / Z
     return precision, recall, f1
 

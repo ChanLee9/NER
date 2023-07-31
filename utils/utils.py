@@ -2,6 +2,7 @@ import torch
 import torch.utils.data as data
 from transformers import AutoTokenizer
 import pandas as pd
+import numpy as np
 
 from .preprocess import DataProcessor
 from dataclasses import dataclass
@@ -90,7 +91,7 @@ class MyDataLoader():
         self.device = config.device
         self.dataset = dataset
         self.batch_size = config.batch_size
-        self.max_length = config.max_length
+        self.max_length = int(np.ceil(config.span / 32) * 32)
         self.label2id = dataset.label2id
         self.tokenizer = AutoTokenizer.from_pretrained(config.model_name_or_path)
     

@@ -10,7 +10,6 @@ def get_args():
     parser.add_argument('--dropout', type=float, default=0.2, help='dropout rate')
     parser.add_argument('--merge_weight', action='store_true', help='whether to merge weights in bert layers')
     parser.add_argument('--device', type=str, required=True, default='cpu', help='which device to use')
-    parser.add_argument('--max_length', type=int, default=64, help='max length to tokenize sentences')
     parser.add_argument('--batch_size', type=int, default=16, help='batch size')
     parser.add_argument('--epochs', type=int, default=10, help='number of epochs')
     parser.add_argument('--lr', type=float, default=2e-5, help='learning rate')

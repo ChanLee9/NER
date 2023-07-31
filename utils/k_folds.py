@@ -43,7 +43,7 @@ def generate_data_for_kfolds(data, config):
         induces: k-折交叉验证的train, val index
         test: 测试集
     """
-    train, test = train_test_split(data, test_size=config.test_size)
+    train, test = train_test_split(data, test_size=config.test_size, random_state=42)
     kfold = KFold(n_splits=config.k_folds, shuffle=True, random_state=42)
     induces = kfold.split(train)
     
@@ -223,7 +223,7 @@ def k_folds(config, data):
     model = model.to(config.device)
     
     res = test_loop(config, test_dataloader, model, mode='testing')
-
+    breakpoint()
     results = {
         "average_precision": np.mean(res[0]),
         "average_recall": np.mean(res[1]),

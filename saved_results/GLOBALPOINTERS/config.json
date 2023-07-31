@@ -7,7 +7,7 @@
     "max_length": 64,
     "batch_size": 16,
     "epochs": 5,
-    "lr": 0.0003,
+    "lr": 3e-05,
     "data_path": "data/train_data_public.csv",
     "save_path": "saved_results",
     "label_path": "data/label.txt",
