@@ -1,8 +1,9 @@
+import json
+import pandas as pd
 import numpy as np
 import torch
 from tqdm import tqdm
 from transformers import get_scheduler
-from sklearn.metrics import f1_score, precision_score, recall_score
 
 WEIGHT_DECAY = 1e-2
 
@@ -20,48 +21,14 @@ def train_loop(dataloader, model, optimizer, lr_scheduler, epoch, config):     #
     total_loss = 0.
     progress_bar = tqdm(range(len(dataloader)))
     progress_bar.set_description(f'epoch: {epoch}, loss: {0:>4f}')
-    if config.use_amp:
-        scaler = torch.cuda.amp.GradScaler()
+    
     model.train()  
-    iter_num = config.grad_accumulation    # 梯度累计的更新频率
-    for batch, encodings in enumerate(dataloader):
-        if 'BERT' not in config.model:
-            input_ids = encodings[0]
-            label_ids = encodings[1]
-            mask = encodings[2]
-        else:
-            text_encoding = encodings[0]
-            label_ids = encodings[1]
-            input_ids = text_encoding['input_ids']
-            mask = text_encoding['attention_mask']        
-        if config.use_amp:
-            # 把计算loss过程中可以转化成混合精度的自动转换
-            with torch.cuda.amp.autocast():
-                loss = model.loss_fn(input_ids, label_ids, mask)
-                # scaler的作用是防止梯度过小，造成下溢出，导致无法更新参数。因此我们先放大再进行后向传播
-                scaler.scale(loss).backward()
-                # 梯度累计
-                if config.grad_accumulation:
-                    if (batch+1) % iter_num == 0:
-                        scaler.step(optimizer)
-                        lr_scheduler.step()
-                        scaler.update()
-                else:
-                    scaler.step(optimizer)
-                    lr_scheduler.step()
-                    scaler.update()
-                    
-        else:
-            loss = model.loss_fn(input_ids, label_ids, mask)
-            loss.backward()
-            if config.grad_accumulation:
-                if (batch+1)%iter_num == 0:
-                    optimizer.step()
-                    lr_scheduler.step()
-            else:
-                optimizer.step()
-                lr_scheduler.step()
-            
+    for batch, item in enumerate(dataloader):
+        loss = model.loss_fn(item)
+        loss.backward()
+        optimizer.step()
+        lr_scheduler.step()
+        
         optimizer.zero_grad()
         
         total_loss += loss.item()
@@ -70,92 +37,136 @@ def train_loop(dataloader, model, optimizer, lr_scheduler, epoch, config):     #
     return total_loss
 
 def test_loop(config, dataloader, model, mode):
-    assert mode in ['validat', 'test'], 'mode must be validation or test!'
-    print(f'-------------------------{mode}ing----------------------------')
+    progress_bar = tqdm(range(len(dataloader)))
+    progress_bar.set_description(f'{mode}... ')
     model.eval()
     Ps, Rs, F1s = [], [], []
-    R_with_O, P_with_O, F1_with_O = [], [], []
     with torch.no_grad():
-        for batch, encodings in enumerate(dataloader):
-            if 'BERT' not in config.model:
-                input_ids = encodings[0]
-                label_ids = encodings[1]
-                mask = encodings[2]
-            else:
-                text_encoding = encodings[0]
-                label_ids = encodings[1]
-                input_ids = text_encoding['input_ids']
-                mask = text_encoding['attention_mask'] 
+        for batch, item in enumerate(dataloader):
             # y_pred的例子 ：[[1, 2, 3], [2, 3], [1]], 之所以长度不同是因为有mask的存在。长度递减是因为dataloader中按照长度给输入排序了。
-            y_pred = model(input_ids, label_ids, mask)
-            res, res_with_o = eval(y_pred, label_ids)
+            y_pred = model(item)
+            if config.model == "GLOBALPOINTERS":
+                res = eval_globalpointers(y_pred, item)
+            else:
+                res = eval(y_pred, item, config)
 
             Ps.append(res[0])
             Rs.append(res[1])
             F1s.append(res[2])
+            
+            progress_bar.update(1)
+        print(f'{mode}: precision: {np.mean(Ps)} || recall: {np.mean(Rs)} || f1_score: {np.mean(F1s)}')
+    return Ps, Rs, F1s
 
-            P_with_O.append(res_with_o[0])
-            R_with_O.append(res_with_o[1])
-            F1_with_O.append(res_with_o[2])
+def eval_globalpointers(y_pred, item):
+    """评估globalpointers模型
 
-        print(f'without class O: precision: {np.mean(Ps)} || recall: {np.mean(Rs)} || f1_score: {np.mean(F1s)}')
-        print(f'with class O: precision: {np.mean(P_with_O)} || recall: {np.mean(R_with_O)} || f1_score: {np.mean(F1_with_O)}\n')
-    return (Ps, Rs, F1s), (P_with_O, R_with_O, F1_with_O)
+    Args:
+        y_pred (_type_): y_pred: shape of (batchsize, entity_type_num, seq_len, seq_len)
+        item (_type_): 只取y_true = item["label_for_gp"]
 
-def eval(y_pred, label_ids):
+    Returns:
+        _type_: _description_
+    """
+    y_true = item["label_for_gp"]
+    y_pred = y_pred.data.cpu().numpy()
+    y_true = y_true.data.cpu().numpy()
+    pred = []
+    true = []
+    for b, l, start, end in zip(*np.where(y_pred > 0)):
+        pred.append((b, l, start, end))
+    for b, l, start, end in zip(*np.where(y_true > 0)):
+        true.append((b, l, start, end))
+
+    P = set(pred)
+    T = set(true)
+    X = len(P & T)
+    Y = len(P)
+    Z = len(T)
+    if Y * Z == 0:
+        return 0, 0, 0
+    f1, precision, recall = 2 * X / (Y + Z), X / Y, X / Z
+    return precision, recall, f1
+
+def get_label_id_map(label_path):
+        """
+        获取label到id的映射字典和id到label的映射字典
+        """
+        labels = pd.read_csv(label_path)
+        label2id = {}
+        for idx, item in labels.iterrows():
+            label, id = item["label"], item["id"]
+            label2id[label] = int(id)
+        id2label = {}
+        for item in label2id:
+            id2label[label2id[item]] = item
+        return label2id, id2label
+
+def extract_entity(y_pred, config):
+    """从预测的BIO序列中提取实体
+
+    Args:
+        y_pred (_type_): list of shape (batch_size, seq_len)
+    """
+    # 去掉 [CLS] 和 [SEP] 特殊标记
+    if "GPT" not in config.model:
+        for row in range(len(y_pred)):
+            y_pred[row] = y_pred[row][1:-1]
+    pred_entities = []
+    label2id, id2label = get_label_id_map(config.label_path)
+    
+    if "GPT" in config.model:
+        # 此时生成的是BIO标注，我们需要先把它转化成对应的编号
+        for row in range(len(y_pred)):
+            for i in range(len(y_pred[row])):
+                y_pred[row][i] = label2id.get(y_pred[row][i], 0)
+                
+    for row in range(len(y_pred)):
+        pred_entities.append([])
+        i = 0
+        while i < len(y_pred[row]):
+            if y_pred[row][i] == 0:
+                i += 1
+                continue
+            
+            # 定位实体
+            entity = id2label[y_pred[row][i]][2:]
+            j = i + 1
+            while j < len(y_pred[row]) and id2label[y_pred[row][j]] == f"I-{entity}":
+                j += 1
+            pred_entities[row].append((entity, i, j))
+            i = j
+
+    return pred_entities
+    
+def eval(y_pred, item, config):
     '''
     y_pred : model预测的结果
     label_ids : 真值
-    我们这里用strict F1 score， 定义见<https://www.datafountain.cn/competitions/529/datasets>
-    我们考虑有实体类别 O 和没有实体类别 O 这两种情况的 p-r-f1值
+    我们考虑实体级别的F1值，因此我们需要先从BIO标注提取实体然后计算F1值
     '''
-    # 我们只考虑主要实体部分，如果标签是-100，我们就不考虑
-    R_with_O, P_with_O, F1_with_O = [], [], []
-    R, P, F1 = [], [], []
-    labels = label_ids.tolist()
-    for row in range(len(labels)):
-        # 去掉 [CLS] 和 [SEP] 特殊标记
-        labels[row] = labels[row][1:-1]
-        y_pred[row] = y_pred[row][1:-1]
-
-        # 有实体类别 O 的情况
-        P_with_O.append(
-            precision_score(labels[row], y_pred[row], average="macro", zero_division=0)
-        )
-        R_with_O.append(
-            recall_score(labels[row], y_pred[row], average="macro", zero_division=0)
-        )
-        F1_with_O.append(
-            f1_score(labels[row], y_pred[row], average="macro", zero_division=0)
-        )
-        # 没有实体类别 O 的情况
-        cur_true, cur_pred = [], []
-        for i in range(len(y_pred[row])):
-            # 如果标签不是 0 或者标签是 0 但预测结果不是 0 
-            if labels[row][i] != 0 or y_pred[row][i] != 0:
-                cur_true.append(labels[row][i])
-                cur_pred.append(y_pred[row][i])
-        # 如果这一行没有一个除 O 之外的实体类别，则直接跳过这一行
-        if not cur_pred:
+    entities = item["entities"]
+    pred_entities = extract_entity(y_pred, config)
+    true_entities = []
+    
+    Ps, Rs, F1s = [], [], []
+    
+    for row in range(len(entities)):
+        true_entities.append([])
+        if not entities[row]:
             continue
-
-        P.append(
-            precision_score(cur_true, cur_pred, average="macro", zero_division=0)
-        )
-        R.append(
-            recall_score(cur_true, cur_pred, average="macro", zero_division=0)
-        )
-        F1.append(
-            f1_score(cur_true, cur_pred, average="macro", zero_division=0)
-        )
-    
-    precision = np.mean(P)
-    recall = np.mean(R)
-    f1score = np.mean(F1)
-
-    precision_with_o = np.mean(P_with_O)
-    recall_with_o = np.mean(R_with_O)
-    f1_score_with_o = np.mean(F1_with_O)
-    
-    return (precision, recall, f1score), (precision_with_o, recall_with_o, f1_score_with_o)
+        for item in entities[row]:
+            true_entities[row].append((item[1], item[2], item[3]))
+            
+    for row in range(len(pred_entities)):
+        P = len(set(pred_entities[row]))
+        T = len(set(true_entities[row]))
+        S = len(set(pred_entities[row]) & set(true_entities[row]))
+        if P * T == 0:
+            continue
+        Ps.append(S / P)
+        Rs.append(S / T)
+        F1s.append(2 * S / (P + T))     
+           
+    return np.mean(Ps), np.mean(Rs), np.mean(F1s)    
 

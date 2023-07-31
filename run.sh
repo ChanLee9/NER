@@ -1,8 +1,8 @@
 python main.py \
---model BiLSTM_CRF \
+--model GLOBALPOINTERS \
+--model_name_or_path pretrained_models/bert-base-chinese \
 --device cuda:0 \
---lr 3e-3 \
---epochs 5
-# --use_lora \
-# --use_amp \
-# --grad_accumulation 15
+--lr 3e-4 \
+--augmentation_level 4 \
+--epochs 5 \
+--k_folds 5 \
